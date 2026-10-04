@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+assets/fvox/
+.cache/
+artifacts/
+
+# Machine-specific instructions, settings, credentials, and development output.
+/AGENTS.md
+/.agents/
+/.codex/
+/.vscode/
+/.idea/
+.env
+.env.*
+!.env.example
+*.log
+*.pid
+*.wav.part
+/dist/
+/build/
+.pytest_cache/
+.coverage
+htmlcov/
+Thumbs.db
+Desktop.ini

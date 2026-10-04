@@ -1,0 +1,21 @@
+[Unit]
+Description=Half-Life HEV battery announcements for Steam Frame
+After=pipewire.service steamos-powerbuttond.service steam.service
+PartOf=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=notify
+NotifyAccess=main
+EnvironmentFile=-%h/.config/frame-hev/environment
+ExecStartPre=/usr/bin/systemctl --user is-active --quiet steamos-powerbuttond.service
+ExecStart=/usr/bin/python3 %h/.local/share/frame-hev/frame_hev.py run
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=5
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=graphical-session.target

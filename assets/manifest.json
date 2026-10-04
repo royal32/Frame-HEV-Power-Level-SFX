@@ -1,0 +1,356 @@
+{
+  "schema_version": 1,
+  "game": "Half-Life (1998)",
+  "voice": "HEV suit (fvox)",
+  "rights_holder": "Valve",
+  "download_catalog": "https://hl1sfx.com/",
+  "user_reference": "https://www.101soundboards.com/search/half-life-hev-suit",
+  "audio_format": "WAV PCM unsigned 8-bit mono 11025 Hz",
+  "exact_percent_range": [
+    1,
+    100
+  ],
+  "zero_fallback": "fvox/armor_gone.wav",
+  "clips": [
+    {
+      "path": "fvox/power_level_is.wav",
+      "url": "https://hl1sfx.com/download/fvox/power_level_is.wav",
+      "bytes": 23860,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 23732,
+      "sha256": "6c89029253087edac65f66f3df06bf7c7fbebe39e4d076214b847693cb0c554e"
+    },
+    {
+      "path": "fvox/percent.wav",
+      "url": "https://hl1sfx.com/download/fvox/percent.wav",
+      "bytes": 8534,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 8405,
+      "sha256": "75fc2170a6d4dca0bf6b37455233a556e290671e2edac41c008b714bbb82d555"
+    },
+    {
+      "path": "fvox/armor_gone.wav",
+      "url": "https://hl1sfx.com/download/fvox/armor_gone.wav",
+      "bytes": 22678,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 22549,
+      "sha256": "8af8aef78354e8003f3a7959c1826f50cfc45dfb708822037472bb4370e56fec"
+    },
+    {
+      "path": "fvox/fuzz.wav",
+      "url": "https://hl1sfx.com/download/fvox/fuzz.wav",
+      "bytes": 2738,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 2612,
+      "sha256": "fee49f77a5dfc9136635186262c45b5b92411625e11b7c7e748ec2c8b161d2ba"
+    },
+    {
+      "path": "fvox/power_restored.wav",
+      "url": "https://hl1sfx.com/download/fvox/power_restored.wav",
+      "bytes": 16102,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 15973,
+      "sha256": "091a289665cfa30b1a8af5c305ee834041ab50c57d79f5b065aa9f0b8a077545"
+    },
+    {
+      "path": "fvox/one.wav",
+      "url": "https://hl1sfx.com/download/fvox/one.wav",
+      "bytes": 7880,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 7752,
+      "sha256": "671555bb1888f792d78102173a80b3dd231cfafb00aa3eb3ed63be56d8c18f9a"
+    },
+    {
+      "path": "fvox/two.wav",
+      "url": "https://hl1sfx.com/download/fvox/two.wav",
+      "bytes": 7558,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 7429,
+      "sha256": "1f7502afdb9c5b3ba91c8ecaf61f24a4dc70b74915f80063a4b0a5c3f424e18c"
+    },
+    {
+      "path": "fvox/three.wav",
+      "url": "https://hl1sfx.com/download/fvox/three.wav",
+      "bytes": 8688,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 8559,
+      "sha256": "3f0b9f764e233a26374be9433a3713d24262034923755cfd1fe76cce40bbd38c"
+    },
+    {
+      "path": "fvox/four.wav",
+      "url": "https://hl1sfx.com/download/fvox/four.wav",
+      "bytes": 8688,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 8560,
+      "sha256": "6a46d0e32583c61782409a29f90d4d1f2c8afa69db57cf4a56d39dd77d4834eb"
+    },
+    {
+      "path": "fvox/five.wav",
+      "url": "https://hl1sfx.com/download/fvox/five.wav",
+      "bytes": 9818,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 9690,
+      "sha256": "c3ea5ed4c9e36c1bd388885621ec32bbd348c177060c9f8f265bfc5d2dc66e52"
+    },
+    {
+      "path": "fvox/six.wav",
+      "url": "https://hl1sfx.com/download/fvox/six.wav",
+      "bytes": 9298,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 9170,
+      "sha256": "b66da70eb0e7b1fbac0cb4b2af716f939f26cdb4ae920fd96d167dc5e9e6d23f"
+    },
+    {
+      "path": "fvox/seven.wav",
+      "url": "https://hl1sfx.com/download/fvox/seven.wav",
+      "bytes": 8326,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 8198,
+      "sha256": "8bd1570625f490cb1c48386361f63db92c18f02ba5fcf4d8902413f6081a278a"
+    },
+    {
+      "path": "fvox/eight.wav",
+      "url": "https://hl1sfx.com/download/fvox/eight.wav",
+      "bytes": 6520,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 6391,
+      "sha256": "e4f39cc03a8ab513066bb14401733759383859fba5024b8cb876040096b7a935"
+    },
+    {
+      "path": "fvox/nine.wav",
+      "url": "https://hl1sfx.com/download/fvox/nine.wav",
+      "bytes": 9298,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 9170,
+      "sha256": "67d631ba44b9fb52e83ef013ada6603d19062de9a7896f262db303032975180f"
+    },
+    {
+      "path": "fvox/ten.wav",
+      "url": "https://hl1sfx.com/download/fvox/ten.wav",
+      "bytes": 6548,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 6419,
+      "sha256": "fe3ae7ff5797fa4543ddd63cdba02fa69cbc23c2be9c472e433dc0b791cc2ada"
+    },
+    {
+      "path": "fvox/eleven.wav",
+      "url": "https://hl1sfx.com/download/fvox/eleven.wav",
+      "bytes": 8326,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 8198,
+      "sha256": "90cd6dfa9830258300e41a571fb5af771544b8f59ba78f5bf7172d7dfb2eb755"
+    },
+    {
+      "path": "fvox/twelve.wav",
+      "url": "https://hl1sfx.com/download/fvox/twelve.wav",
+      "bytes": 8944,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 8816,
+      "sha256": "abdc920bd9c3c2e0e6d8751ee12e8d9c512147559ce4de83686203bb74be86c0"
+    },
+    {
+      "path": "fvox/thirteen.wav",
+      "url": "https://hl1sfx.com/download/fvox/thirteen.wav",
+      "bytes": 11110,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 10982,
+      "sha256": "635d309f7148adb3f22507ab5b266268908a4e914fd1c546bfd6e6a6dfc49523"
+    },
+    {
+      "path": "fvox/fourteen.wav",
+      "url": "https://hl1sfx.com/download/fvox/fourteen.wav",
+      "bytes": 10492,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 10363,
+      "sha256": "d874e7805e32dce166c4797e75ffea0ae38460633c906641a1a3d796dd56e300"
+    },
+    {
+      "path": "fvox/fifteen.wav",
+      "url": "https://hl1sfx.com/download/fvox/fifteen.wav",
+      "bytes": 10956,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 10827,
+      "sha256": "863f7d93fb2757f8627b0a7da29f150385cd527228b3f3184993b794fd1d6eb4"
+    },
+    {
+      "path": "fvox/sixteen.wav",
+      "url": "https://hl1sfx.com/download/fvox/sixteen.wav",
+      "bytes": 11574,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 11446,
+      "sha256": "033e54de3654f91fcb340b59aabff3e6a3b6468d3eb1932b195abc49b0423afc"
+    },
+    {
+      "path": "fvox/seventeen.wav",
+      "url": "https://hl1sfx.com/download/fvox/seventeen.wav",
+      "bytes": 11808,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 11680,
+      "sha256": "8173200ac2455cbbfdb6821d12aa4044290ebc6cbcd1a8d595a4eb814695d8e4"
+    },
+    {
+      "path": "fvox/eighteen.wav",
+      "url": "https://hl1sfx.com/download/fvox/eighteen.wav",
+      "bytes": 9042,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 8914,
+      "sha256": "91233b0c00f49e6725b4a51ed973cab56d8ba69ef63587b07d55cb197ae41f84"
+    },
+    {
+      "path": "fvox/nineteen.wav",
+      "url": "https://hl1sfx.com/download/fvox/nineteen.wav",
+      "bytes": 10118,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 9990,
+      "sha256": "bdd537801a717babaa096e682230d25222327c652a26661b0486979986cf5d1a"
+    },
+    {
+      "path": "fvox/twenty.wav",
+      "url": "https://hl1sfx.com/download/fvox/twenty.wav",
+      "bytes": 9196,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 9068,
+      "sha256": "a8f785bed1d68f96f77ea28f5126c079197d1e1539dc5b013ba1783953cd1c90"
+    },
+    {
+      "path": "fvox/twentyfive.wav",
+      "url": "https://hl1sfx.com/download/fvox/twentyfive.wav",
+      "bytes": 12964,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 12836,
+      "sha256": "7d218429c83459187e09284ffcdeaeb15a3fbea14e398d78e91af651e77be85c"
+    },
+    {
+      "path": "fvox/thirty.wav",
+      "url": "https://hl1sfx.com/download/fvox/thirty.wav",
+      "bytes": 9690,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 9562,
+      "sha256": "b5d92c11f4b1ed4248d9ce502b6cd9e606591223621ff29904c3ea19d3376597"
+    },
+    {
+      "path": "fvox/fourty.wav",
+      "url": "https://hl1sfx.com/download/fvox/fourty.wav",
+      "bytes": 10082,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 9953,
+      "sha256": "a3b5dc520d8cf3ec6214cea580412f0bb386b813c2bfb65bb7ccc370f9274099"
+    },
+    {
+      "path": "fvox/fifty.wav",
+      "url": "https://hl1sfx.com/download/fvox/fifty.wav",
+      "bytes": 11130,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 11002,
+      "sha256": "7b1385ab1188804776bdd947de5c1a5662978b649a47f1ec607071e3087cca29"
+    },
+    {
+      "path": "fvox/sixty.wav",
+      "url": "https://hl1sfx.com/download/fvox/sixty.wav",
+      "bytes": 11058,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 10930,
+      "sha256": "345fb45e9e4ecf19c702cb80b353dae882f2e5df1f474613420f097026871652"
+    },
+    {
+      "path": "fvox/seventy.wav",
+      "url": "https://hl1sfx.com/download/fvox/seventy.wav",
+      "bytes": 10668,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 10539,
+      "sha256": "edaec227ee2950046caa9f6a2d5e16dcb600e727f4044607575913c6ee78d5d7"
+    },
+    {
+      "path": "fvox/eighty.wav",
+      "url": "https://hl1sfx.com/download/fvox/eighty.wav",
+      "bytes": 7934,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 7806,
+      "sha256": "bd95b93e3ea8fe8dc3554d4a4b9b4b3c722c5de36177b3685e9bd2dd2ca8851c"
+    },
+    {
+      "path": "fvox/ninety.wav",
+      "url": "https://hl1sfx.com/download/fvox/ninety.wav",
+      "bytes": 10668,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 10539,
+      "sha256": "c676f687aed48adf49bc8c8f488be606b0779c57ed327f14b05c490ed202f44d"
+    },
+    {
+      "path": "fvox/onehundred.wav",
+      "url": "https://hl1sfx.com/download/fvox/onehundred.wav",
+      "bytes": 11006,
+      "channels": 1,
+      "sample_width_bytes": 1,
+      "sample_rate_hz": 11025,
+      "frames": 10877,
+      "sha256": "6f61230d11c1ea366c0b527c7ce85039250e1241f80d8cc4a31b8d55d5e59517"
+    }
+  ]
+}
