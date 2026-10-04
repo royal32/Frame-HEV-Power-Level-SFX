@@ -1,100 +1,172 @@
 # Steam Frame HEV battery announcements
 
-While the Frame is awake, double-tap its **power button** to hear its current battery percentage
-in the original Half-Life HEV suit voice. A single tap waits briefly for a second
-tap, then invokes Steam's normal sleep action. Holding power invokes Steam's
-normal power menu.
+Double-tap your Steam Frame's power button to hear **“Power level is … percent”**
+in the original Half-Life HEV suit voice.
 
-This is a small Python standard-library application for the Frame's SteamOS
-user session. It uses the existing PipeWire audio server and installs entirely
-under the Steam user's home directory. No root access, package installation,
-or SteamOS filesystem unlock is required on the tested Frame.
+- **Double tap while awake:** reads the exact battery percentage.
+- **Single press:** puts the Frame to sleep, with a short 350 ms delay.
+- **Hold:** opens Steam's normal power menu.
 
-## Install on the Frame
+Runs in the background and starts with your Steam session. No root access,
+additional packages, or SteamOS filesystem unlock needed.
 
-Obtain the audio locally first. The WAV files are ignored by Git; their original
-source URLs and SHA-256 checksums are recorded in `assets/manifest.json`.
+## Install
 
-```sh
-python3 tools/fetch_sounds.py
-python3 tools/fetch_sounds.py --check
-```
+### 1. Prepare the Frame once
 
-Copy this directory to the Frame (for example `~/frame-hev-dev`), then run as
-`steamos` in its running Steam session:
+On the headset, enable **Settings → System → Enable Developer Mode**, then open
+**Settings → Developer → Set User Password** and choose a password. This enables
+SSH access as `steamos`; use that password when the installer asks.
+See [Valve's setup guide](https://partner.steamgames.com/doc/steamhardware/steamframe/setup)
+and [SSH documentation](https://partner.steamgames.com/doc/steamhardware/steamframe/debugging).
 
-```sh
-cd ~/frame-hev-dev
-bash tools/install.sh
-```
+Keep the Frame awake, with Steam running, and connect it to the same network as
+your computer.
 
-The installer verifies the audio and runtime requirements before enabling the
-user service. The native `steamos-powerbuttond` must be running. Its service and
-configuration are left intact.
+### 2. Download and run
 
-## Use and configure
+Download the release ZIP, or choose **Code → Download ZIP** on GitHub, and
+**extract the whole folder**. Open a terminal in that extracted folder.
 
-- **Double tap:** “Power level is … percent,” with the exact reported integer.
-- **Single tap:** normal Steam sleep action after the double-tap window.
-- **Hold:** normal Steam power menu at one second.
-- **0%:** original “Armor compromised” clip; the original HEV vocabulary has no zero.
-
-The default double-tap gap is 350 ms from the first release to the next press.
-Announcement volume is 65% of the current headset output volume. Adjust
-`~/.config/frame-hev/environment`, then restart the service:
+**macOS or Linux:**
 
 ```sh
-systemctl --user restart frame-hev
-systemctl --user status frame-hev
-journalctl --user -u frame-hev -f
+bash install.sh
 ```
 
-To announce immediately over SSH:
+**Windows PowerShell:**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Enter the Frame's password when SSH asks. Password characters do not appear as
+you type. Windows may ask twice, once to upload and once to install. On the
+first connection, SSH may ask you to accept the headset's host key.
+
+The installer copies the app to the Frame, downloads and verifies the original
+audio, and enables the background service. Your computer needs SSH and tar;
+Windows also needs scp (part of OpenSSH Client). Python is only required on the
+Frame, where SteamOS already provides it.
+
+When it says **installed**, double-tap power on the awake headset. Installation
+does not automatically play a sound.
+
+If `frame.local` cannot be found, try `frame` or the Frame's IP address:
 
 ```sh
-python3 ~/.local/share/frame-hev/frame_hev.py announce
+bash install.sh --host steamos@frame
 ```
 
-The first second after waking ignores button events to avoid treating the wake
-press as a request to sleep again. Wait a moment after waking, then double-tap.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -HostName steamos@frame
+```
 
-`FRAME_HEV_BUTTON=aux` selects the auxiliary button above power as an optional
-fallback. That mode observes `KEY_SELECT` without grabbing its shared input
-device, so the existing auxiliary-button behavior also runs. Power mode is the
-intended default.
+**Already using a terminal on the Frame?** Extract the download there and run
+`bash install.sh --local`. All installer commands run as the normal Steam user,
+without `sudo`.
 
-## Stop or remove
+## Update or uninstall
+
+To update, download a newer release and run the same installer again. It reuses
+verified audio and preserves your settings. It prepares and checks the update
+before replacing the running installation, and rolls back if startup fails.
+
+To uninstall, connect with `ssh steamos@frame.local` and run:
 
 ```sh
-systemctl --user stop frame-hev
-# Or remove startup registration:
-bash ~/frame-hev-dev/tools/uninstall.sh
+~/.local/bin/frame-hev uninstall --purge
 ```
 
-The daemon exclusively reads the dedicated power-button input device while it
-is running. Stopping it or a process exit releases that grab, allowing the
-already-running native handler to receive subsequent presses again. The
-service does not replace firmware behavior or change power-button boot logic.
+This removes the app, startup service, settings, and cached audio. Omit
+`--purge` to keep your settings and cache. The native power-button handler
+receives presses again when the HEV service stops.
 
-The uninstall script retains the app, audio, and settings for easy reinstall.
+## Controls and settings
 
-## Development and tests
+These commands run **on the Frame**, either in its terminal or over SSH:
+
+```sh
+~/.local/bin/frame-hev announce   # Speak the current battery
+~/.local/bin/frame-hev status     # Check the service
+~/.local/bin/frame-hev logs       # Follow logs; Ctrl+C to exit
+~/.local/bin/frame-hev stop       # Temporarily restore normal power behavior
+~/.local/bin/frame-hev start
+```
+
+Edit `~/.config/frame-hev/environment`, then run
+`~/.local/bin/frame-hev restart`.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `FRAME_HEV_VOLUME` | `0.65` | Announcement volume from `0.0` to `1.0`, relative to headset volume |
+| `FRAME_HEV_DOUBLE_TAP_MS` | `350` | Maximum gap between the first release and second press |
+| `FRAME_HEV_BUTTON` | `power` | Use `aux` for the button above power instead |
+
+Aux mode also allows the button's normal action to occur. Power mode is the
+tested default. After waking the Frame, wait one second before double-tapping;
+the wake press is ignored so it does not immediately put the headset to sleep.
+
+At 0%, the original “Armor compromised” clip plays, because the HEV vocabulary
+does not contain a recorded zero.
+
+## Audio
+
+The source repository and release downloads contain **no Half-Life audio**.
+The installer fetches the original WAV clips from [hl1sfx.com](https://hl1sfx.com/)
+and verifies their recorded SHA-256 hashes and WAV format. Audio remains Valve's
+property and is not covered by the code's license.
+
+To use loose audio files from your own Half-Life installation, point to its
+`valve`, `sound`, or `fvox` directory **on the Frame**:
+
+```sh
+bash install.sh --source-dir /path/on/frame/to/Half-Life/valve
+```
+
+On Windows, use `-SourceDir` instead. `--offline` (Windows: `-Offline`) prevents
+downloads and uses verified files already on the Frame. See
+[audio provenance and import details](assets/README.md).
+
+## Troubleshooting
+
+- **Cannot connect:** keep the headset awake, check Developer Mode and your
+  password, and try `ssh steamos@frame.local`. Try `frame` or the headset's IP if
+  your network does not resolve `.local` names.
+- **Native button service is inactive:** wake the headset and leave Steam
+  running before installing.
+- **No sound:** check headset volume, run `~/.local/bin/frame-hev announce`, then
+  `~/.local/bin/frame-hev doctor` and `~/.local/bin/frame-hev logs`.
+- **Download or checksum error:** retry. A failed download does not replace a
+  working installation. If the source remains unavailable, use a local game
+  copy as described above.
+- **After a SteamOS update:** rerun the installer. Input or Steam interfaces may
+  change across firmware versions.
+
+## Development and releases
+
+Tested on SteamOS 0.4.3, variant `vr`, build `20260930.6234839`. Physical double-tap
+announcements and single-press sleep/wake were confirmed. The Windows installer
+is provided, but has not yet been run end-to-end on Windows.
 
 ```sh
 python3 -m unittest discover -s tests -v
-python3 tools/fetch_sounds.py --check
-python3 frame_hev.py doctor
-# On the Frame, exercise the real evdev/uinput path without issuing Steam actions:
-python3 tools/smoke_input.py
+python3 tools/build_release.py
 ```
 
-[Frame development notes](docs/frame-development.md) record the actual button,
-battery, audio, SSH, and browser-debugging interfaces discovered on the headset.
-The repository also includes a small remote UI inspection/click/screenshot
-helper for future development.
+The release builder creates `dist/frame-hev-0.1.0.zip`,
+`dist/frame-hev-0.1.0.tar.gz`, and `dist/SHA256SUMS`, using the version in
+`VERSION`. Attach those three files to a GitHub release. The builder uses an
+explicit file list and excludes audio, credentials, local agent settings, and
+Git history.
 
-[Validation record](docs/validation.md) distinguishes automated results,
-physical confirmation, and checks that have not been performed.
+[Frame development notes](docs/frame-development.md) include remote UI
+inspection, screenshots, and click automation.
+[Validation details](docs/validation.md) separate automated results from
+physical checks.
 
-See [audio provenance](assets/README.md) for original clips, import instructions,
-and the distinction between original recordings and the assembled phrases.
+## License
+
+Application code: **GPL-3.0-only**. See [LICENSE](LICENSE).
+Half-Life audio is separate Valve material. This is an unofficial community
+project and is not affiliated with or endorsed by Valve.

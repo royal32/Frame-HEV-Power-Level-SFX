@@ -39,3 +39,25 @@ cold-boot startup, or behavior across a SteamOS update. Native single/long actio
 selection is tested; these remaining device checks should not be inferred from
 the automated results. There is no change to boot firmware or the native power
 button service.
+
+## Public package validation
+
+- The release contains source, installers, license, and documentation. Original
+  WAV files, machine-specific agent instructions, settings, and Git history are
+  excluded through an explicit release file list. ZIP and tar.gz builds are
+  reproducible from identical source bytes and ship with SHA-256 checksums.
+- The macOS/Linux root installer was exercised from the extracted release
+  archive against the real Frame over SSH. It transferred an audio-free package,
+  reused 34 verified clips from the existing installation, and successfully
+  enabled the updated user service.
+- The automated suite has 36 tests: 21 runtime tests, 10 downloader tests, and
+  5 installer transaction tests with multiple failure/state combinations.
+  Downloader tests cover four concurrent requests, offline/cache imports, and
+  preservation of existing files after corrupt downloads. Installer tests cover
+  preserved settings, failures before replacement, and rollback of app files
+  and service state after startup failure.
+- Bash syntax and one-connection transport were checked. Source-directory
+  arguments containing quotes, command substitution syntax, and newlines were
+  preserved literally. Windows uses a file transfer rather than a binary
+  PowerShell pipeline; its remote argument-decoding protocol was checked, but
+  the PowerShell script has not been executed on Windows.

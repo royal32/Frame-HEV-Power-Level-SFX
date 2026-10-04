@@ -24,3 +24,6 @@ artifacts/
 htmlcov/
 Thumbs.db
 Desktop.ini
+._*
+/.ssh/
+/.aws/

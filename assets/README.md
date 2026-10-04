@@ -20,6 +20,12 @@ python3 tools/fetch_sounds.py
 python3 tools/fetch_sounds.py --check
 ```
 
+The main installer does this automatically. It reuses verified audio from an
+existing installation and downloads missing clips with up to four concurrent
+requests. Use `--cache-dir /path/to/assets` to reuse a directory containing
+`fvox/`, or `--offline` to forbid downloads. `--quiet` displays only the summary
+and errors. A failed or changed download is never installed over a valid clip.
+
 Or import the same clips from an installed game without downloading:
 
 ```sh
