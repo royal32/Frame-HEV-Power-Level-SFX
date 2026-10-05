@@ -36,6 +36,11 @@ bash install.sh
 
 **Windows PowerShell:**
 
+Use a PowerShell tab in **Windows Terminal**, or press **Win+R**, type
+`powershell`, and press Enter to open a normal console. PowerShell ISE cannot
+handle SSH's interactive keyboard prompts. Run the command from the extracted
+folder without piping or redirecting its input.
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -133,8 +138,33 @@ downloads and uses verified files already on the Frame. See
 - **Cannot connect:** keep the headset awake, check Developer Mode and your
   password, and try `ssh steamos@frame.local`. Try `frame` or the headset's IP if
   your network does not resolve `.local` names.
-- **Native button service is inactive:** wake the headset and leave Steam
-  running before installing.
+- **Windows prompt accepts no typing:** use Windows Terminal or a normal
+  PowerShell console, rather than PowerShell ISE. Run `ssh steamos@frame.local`
+  there first. At the host-key confirmation, type `yes` and press Enter after
+  checking it is your Frame; at the password prompt, characters are invisible.
+  After connecting, type `exit`, then rerun the installer from the extracted
+  folder. If even standalone SSH cannot accept input, the issue is with the
+  terminal/SSH client before the Frame installer starts.
+- **“Wake the Frame” while it is already awake (v0.1.0):** that release uses
+  the same error for an inactive native button service and a failed connection
+  to the Steam user's service manager. It does not prove the headset is asleep.
+  A desktop terminal can also have different session environment variables.
+  From the extracted folder **on the Frame**, retry with the Steam user's session:
+
+  ```sh
+  env XDG_RUNTIME_DIR="/run/user/$(id -u)" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus" bash install.sh --local
+  ```
+
+  If it still fails, leave Steam/SteamVR running and collect the actual state
+  with this read-only command on the Frame:
+
+  ```sh
+  env XDG_RUNTIME_DIR="/run/user/$(id -u)" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus" systemctl --user --no-pager --full status steamos-powerbuttond.service steamvr.service
+  ```
+
+  Include that output and your SteamOS version in a bug report. The current
+  installer selects this session automatically and reports the specific
+  failure. Keep the native power-button service installed and enabled.
 - **No sound:** check headset volume, run `~/.local/bin/frame-hev announce`, then
   `~/.local/bin/frame-hev doctor` and `~/.local/bin/frame-hev logs`.
 - **Download or checksum error:** retry. A failed download does not replace a

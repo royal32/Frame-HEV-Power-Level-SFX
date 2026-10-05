@@ -53,3 +53,35 @@ The system service configuration forwards external port `8081` to Steam's CDP po
 The development-kit service was present at `/usr/share/steamos-devkit/steamos-devkit-service.py`, using port `32000`. An `adbd` service was running, and xrdp was listening on port `3389`. Their presence was confirmed; ADB pairing, authentication, transfer, and remote-desktop usability were not tested. Do not assume they provide a working connection solely because a service exists.
 
 No SSH configuration changes or package installation are needed for the CDP helper. Credentials belong in the user's existing SSH setup, never in this repository or helper.
+
+## Installer session diagnostics
+
+A user reported that the v0.1.0 installer said to wake an already-awake Frame
+when launched from a terminal on the headset. Code inspection confirmed that
+the installer discarded the `systemctl --user is-active` diagnostic and used
+that message for every nonzero result, including a service-manager connection
+failure. It also preserved any inherited `XDG_RUNTIME_DIR` and
+`DBUS_SESSION_BUS_ADDRESS`, which can differ in a desktop session. The user's
+actual environment and service state have not yet been captured; this report
+alone does not establish which failure occurred.
+
+The installer now requires the current user's `/run/user/<uid>/bus` socket and
+sets both session variables explicitly before its subprocesses run. It queries
+`LoadState`, `ActiveState`, `SubState`, and `Result` to distinguish a missing
+native unit, an inactive/failed unit, and a query failure. These checks only
+read native service state. Never bypass them or restart/disable the native
+handler to make installation proceed.
+
+For v0.1.0 troubleshooting, the README includes an `env ... bash install.sh
+--local` retry and a read-only service-status command using the same session.
+The environment selection and error cases have automated regression coverage;
+reproduction in the affected user's desktop session remains unverified.
+
+The same report described a Windows host-key prompt that accepted no keyboard
+input. The user's terminal host is unknown. Microsoft's
+[PowerShell documentation](https://devblogs.microsoft.com/powershell/console-application-non-support-in-the-ise/)
+confirms that ISE cannot run interactive console applications. The installer
+now rejects ISE and redirected stdin before attempting SSH, and failed-upload
+cleanup uses `BatchMode=yes` with a connection timeout so cleanup cannot open
+another password/host-key prompt. Standard SSH host-key checking is preserved.
+Real Windows prompt behavior still needs a Windows test.

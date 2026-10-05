@@ -12,6 +12,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 UNIT = "frame-hev.service"
+NATIVE_UNIT = "steamos-powerbuttond.service"
 
 
 def command(args, *, check=True, capture=False):
@@ -36,12 +37,34 @@ def preflight():
         if not shutil.which(name):
             raise RuntimeError(f"{name} is missing. This installer requires a Steam Frame running SteamOS.")
     runtime = Path(f"/run/user/{os.getuid()}")
-    if (runtime / "bus").exists():
-        os.environ.setdefault("XDG_RUNTIME_DIR", str(runtime))
-        os.environ.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path={runtime}/bus")
-    if systemctl("is-active", "--quiet", "steamos-powerbuttond.service", check=False).returncode:
-        raise RuntimeError("Wake the Frame and leave Steam running, then retry. "
-                           "Its native steamos-powerbuttond service must be active.")
+    if not (runtime / "bus").is_socket():
+        raise RuntimeError(f"The Steam user's session bus was not found at {runtime}/bus. "
+                           "Run as the logged-in Steam user without sudo, with Steam running.")
+    # A desktop/remote-desktop terminal can inherit a separate D-Bus session.
+    # Use this user's systemd session for every installer subprocess, including
+    # doctor and PipeWire, instead of preserving an unrelated inherited address.
+    os.environ["XDG_RUNTIME_DIR"] = str(runtime)
+    os.environ["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={runtime}/bus"
+    result = systemctl("show", NATIVE_UNIT, "--property=LoadState", "--property=ActiveState",
+                       "--property=SubState", "--property=Result", check=False)
+    state = dict(line.split("=", 1) for line in (result.stdout or "").splitlines() if "=" in line)
+    if state.get("LoadState") == "not-found":
+        raise RuntimeError(f"This SteamOS installation has no {NATIVE_UNIT} user service. "
+                           "Its power-button setup may differ from the supported Frame firmware. "
+                           "Please report your SteamOS version and this message.")
+    if result.returncode:
+        detail = (result.stderr or result.stdout or "No diagnostic output.").strip()
+        raise RuntimeError("Could not query the Steam user's service manager. "
+                           "This is a session/service error, not a headset sleep check.\n" + detail)
+    if state.get("LoadState") != "loaded" or state.get("ActiveState") != "active":
+        detail = ", ".join(f"{key}={state.get(key, 'unknown')}"
+                           for key in ("LoadState", "ActiveState", "SubState", "Result"))
+        raise RuntimeError(f"The native power-button service is not ready ({detail}). "
+                           "HEV requires it to be active before taking over button input. "
+                           "Keep Steam/SteamVR running on the awake headset and retry. "
+                           "If it is already awake, collect the actual service error with:\n"
+                           f"env XDG_RUNTIME_DIR={runtime} DBUS_SESSION_BUS_ADDRESS=unix:path={runtime}/bus "
+                           f"systemctl --user --no-pager --full status {NATIVE_UNIT} steamvr.service")
 
 
 def snapshot(path):

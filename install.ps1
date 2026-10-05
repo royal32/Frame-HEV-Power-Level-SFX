@@ -15,8 +15,13 @@ Uploads and installs HEV announcements on your awake Steam Frame using Windows
 OpenSSH and tar. The default target is steamos@frame.local. SSH/scp may each ask
 for your Frame password; no password is stored. -SourceDir is an audio directory
 on the Frame, not on this computer. -Offline disables audio downloading.
+Use Windows Terminal or a normal PowerShell window. PowerShell ISE cannot
+handle the interactive SSH prompts.
 '@
     exit 0
+}
+if ($Host.Name -eq 'Windows PowerShell ISE Host' -or [Console]::IsInputRedirected) {
+    throw 'SSH needs an interactive console. Open Windows Terminal or press Win+R, type powershell, and press Enter. Run this installer there, without piping or redirecting its input. PowerShell ISE does not support SSH keyboard prompts.'
 }
 if ($HostName -notmatch '^([A-Za-z0-9_][A-Za-z0-9_.-]*@)?[A-Za-z0-9][A-Za-z0-9.-]*$') {
     throw 'Use a hostname or IPv4 address, optionally preceded by USER@ (no SSH options or spaces).'
@@ -73,6 +78,8 @@ try {
     & tar -cf $archive -C $PSScriptRoot @files
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the installation archive.' }
     Write-Host "Installing on $HostName. scp and SSH may ask for your Frame password."
+    Write-Host 'On first connection, SSH may ask you to confirm the host fingerprint with yes and Enter.'
+    Write-Host 'Password typing is invisible. If the yes/no prompt ignores keys, use a normal PowerShell window or Windows Terminal.'
     $uploadAttempted = $true
     & scp -- $archive "${HostName}:$remoteArchive"
     if ($LASTEXITCODE -ne 0) { throw 'Upload failed. Check that the Frame is awake and SSH is enabled.' }
@@ -84,7 +91,9 @@ try {
     # A failed scp can leave a partial file. Remove only this invocation's GUID path.
     # Once SSH starts, the remote shell's EXIT trap owns cleanup.
     if ($uploadAttempted -and -not $remoteAttempted) {
-        & ssh -T -- $HostName ('rm -f -- ' + $remoteArchive)
+        # Never open another password/host-key prompt while handling a failed
+        # upload: it can look like the original prompt is stuck in a loop.
+        & ssh -T -o BatchMode=yes -o ConnectTimeout=5 -o ConnectionAttempts=1 -- $HostName ('rm -f -- ' + $remoteArchive)
         if ($LASTEXITCODE -ne 0) { Write-Warning "Could not remove temporary upload $remoteArchive on the Frame." }
     }
 }

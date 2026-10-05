@@ -61,3 +61,18 @@ button service.
   preserved literally. Windows uses a file transfer rather than a binary
   PowerShell pipeline; its remote argument-decoding protocol was checked, but
   the PowerShell script has not been executed on Windows.
+
+## Installer troubleshooting changes (unreleased)
+
+- All 44 Python tests pass on the development Mac, including eight new
+  preflight tests for inherited desktop-session variables, absent session bus,
+  service-manager errors, missing/masked native units, inactive/failed state,
+  and incomplete status output. Existing staging and rollback tests still pass.
+- Bash syntax and `git diff --check` pass. Neither the button runtime nor the
+  systemd unit was changed; the native service requirement remains in place.
+- Windows changes add an early ISE/redirected-input check, prompt guidance, and
+  noninteractive cleanup after failed uploads. They have not been executed in
+  Windows; the reporting user's terminal and exact cause remain unknown.
+- A read-only SSH check could not resolve `frame.local` during this validation.
+  No device installation or service changes were performed. The local-terminal
+  report still needs its actual service status to confirm the cause.

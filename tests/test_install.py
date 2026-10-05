@@ -2,6 +2,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -12,6 +13,81 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("frame_hev_install", ROOT / "tools/install.py")
 installer = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(installer)
+
+
+class PreflightTests(unittest.TestCase):
+    def invoke(self, result, *, bus_exists=True, inherited=None):
+        with (mock.patch.object(installer.sys, "platform", "linux"),
+              mock.patch.object(installer.os, "getuid", return_value=1000),
+              mock.patch.object(installer.shutil, "which", return_value="/usr/bin/tool"),
+              mock.patch.object(Path, "is_socket", return_value=bus_exists),
+              mock.patch.dict(os.environ, inherited or {}, clear=True),
+              mock.patch.object(installer, "systemctl", return_value=result) as service):
+            try:
+                installer.preflight()
+            finally:
+                self.environment = dict(os.environ)
+                self.service_calls = service.call_args_list
+
+    def state(self, *, load="loaded", active="active", sub="running", result="success", code=0):
+        return subprocess.CompletedProcess([], code, stdout=(
+            f"LoadState={load}\nActiveState={active}\nSubState={sub}\nResult={result}\n"), stderr="")
+
+    def assert_read_only(self):
+        self.assertTrue(self.service_calls)
+        self.assertTrue(all(call.args[0] == "show" for call in self.service_calls))
+
+    def test_active_native_service_uses_steam_session_even_with_inherited_desktop_bus(self):
+        self.invoke(self.state(), inherited={
+            "XDG_RUNTIME_DIR": "/tmp/other-session",
+            "DBUS_SESSION_BUS_ADDRESS": "unix:path=/tmp/desktop-private-bus",
+        })
+        self.assertEqual(self.environment["XDG_RUNTIME_DIR"], "/run/user/1000")
+        self.assertEqual(self.environment["DBUS_SESSION_BUS_ADDRESS"], "unix:path=/run/user/1000/bus")
+        self.assert_read_only()
+
+    def test_active_native_service_without_inherited_session(self):
+        self.invoke(self.state())
+        self.assertEqual(self.environment["XDG_RUNTIME_DIR"], "/run/user/1000")
+        self.assertEqual(self.environment["DBUS_SESSION_BUS_ADDRESS"], "unix:path=/run/user/1000/bus")
+
+    def test_missing_bus_fails_before_service_query(self):
+        with self.assertRaisesRegex(RuntimeError, "session bus was not found at /run/user/1000/bus"):
+            self.invoke(self.state(), bus_exists=False)
+        self.assertEqual(self.service_calls, [])
+
+    def test_service_manager_error_preserves_diagnostic_instead_of_claiming_sleep(self):
+        result = subprocess.CompletedProcess([], 1, stdout="", stderr="Failed to connect to bus: Permission denied\n")
+        with self.assertRaisesRegex(RuntimeError, "Failed to connect to bus: Permission denied") as error:
+            self.invoke(result)
+        self.assertNotIn("Wake the Frame", str(error.exception))
+        self.assert_read_only()
+
+    def test_missing_native_unit_reports_firmware_difference(self):
+        for code in (0, 1):
+            with self.subTest(code=code), self.assertRaisesRegex(RuntimeError, "no steamos-powerbuttond.service"):
+                self.invoke(self.state(load="not-found", active="inactive", sub="dead", code=code))
+            self.assert_read_only()
+
+    def test_inactive_or_failed_service_reports_state_and_diagnostic_command(self):
+        for active, sub, result in (("inactive", "dead", "success"), ("failed", "failed", "exit-code")):
+            with self.subTest(active=active):
+                with self.assertRaises(RuntimeError) as error:
+                    self.invoke(self.state(active=active, sub=sub, result=result))
+                self.assertIn(f"ActiveState={active}", str(error.exception))
+                self.assertIn(f"Result={result}", str(error.exception))
+                self.assertIn("status steamos-powerbuttond.service steamvr.service", str(error.exception))
+                self.assert_read_only()
+
+    def test_masked_service_is_not_accepted_even_if_still_running(self):
+        with self.assertRaisesRegex(RuntimeError, "LoadState=masked"):
+            self.invoke(self.state(load="masked"))
+        self.assert_read_only()
+
+    def test_empty_success_output_does_not_bypass_native_service_requirement(self):
+        with self.assertRaisesRegex(RuntimeError, "ActiveState=unknown"):
+            self.invoke(subprocess.CompletedProcess([], 0, stdout="", stderr=""))
+        self.assert_read_only()
 
 
 class FakeHost:
