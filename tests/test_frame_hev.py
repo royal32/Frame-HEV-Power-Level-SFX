@@ -79,6 +79,18 @@ class GestureTests(unittest.TestCase):
         self.assertEqual(self.tap(5), [])
         self.assertEqual(self.g.tick(6), ["short"])
 
+    def test_deadline_only_while_a_gesture_is_in_progress(self):
+        self.assertIsNone(self.g.deadline())
+        self.g.event(1, 1)
+        self.assertEqual(self.g.deadline(), 2)
+        self.g.event(0, 1.06)
+        self.assertAlmostEqual(self.g.deadline(), 1.41)
+        self.assertEqual(self.g.tick(self.g.deadline()), ["short"])
+        self.assertIsNone(self.g.deadline())
+        self.g.event(1, 3)
+        self.assertEqual(self.g.tick(4), ["long"])
+        self.assertIsNone(self.g.deadline())
+
 
 class BatteryTests(unittest.TestCase):
     def battery(self, root, name, percent, scope=None, kind="Battery"):
@@ -221,6 +233,11 @@ class RuntimeSafetyTests(unittest.TestCase):
         execute.assert_not_called()
         self.assertEqual(runner.steam.unfinished_tasks, 0)
 
+    def test_close_unblocks_idle_workers(self):
+        runner = hev.ActionRunner(SimpleNamespace(button="power", dry_run=False, steam=Path("/steam")))
+        runner.close()
+        self.assertFalse(any(thread.is_alive() for thread in runner.threads))
+
     def test_final_pre_spawn_check_discards_action_after_resume(self):
         runner = self.runner()
         with (mock.patch.object(hev, "suspend_offset", return_value=10),
@@ -242,6 +259,7 @@ class RuntimeSafetyTests(unittest.TestCase):
             with (mock.patch.object(hev.Path, "home", return_value=Path(temp)),
                   mock.patch.object(hev, "resolve_device", return_value={"path": "fake", "name": "pmic_pwrkey"}),
                   mock.patch.object(hev, "get_bits", return_value=set()),
+                  mock.patch.object(hev.os, "pipe2", return_value=(97, 98)),
                   mock.patch.object(hev.os, "open", return_value=99),
                   mock.patch.object(hev.os, "close") as close,
                   mock.patch.object(hev.os, "read", return_value=wake_events),
@@ -250,7 +268,7 @@ class RuntimeSafetyTests(unittest.TestCase):
                   mock.patch.object(hev.time, "CLOCK_BOOTTIME", 7, create=True),
                   mock.patch.object(hev.time, "monotonic", side_effect=[1, 1, 60, 60]),
                   mock.patch.object(hev.time, "clock_gettime", side_effect=[1, 1, 90, 90]),
-                  mock.patch.object(hev.select, "select", side_effect=[([99], [], []), KeyboardInterrupt]),
+                  mock.patch.object(hev.select, "select", side_effect=[([99], [], []), KeyboardInterrupt]) as sel,
                   mock.patch.object(hev.signal, "signal"),
                   mock.patch.object(hev, "notify_ready"),
                   mock.patch.object(hev, "ActionRunner") as runner_class):
@@ -259,7 +277,9 @@ class RuntimeSafetyTests(unittest.TestCase):
                 with self.assertRaises(KeyboardInterrupt):
                     hev.run(args)
                 runner.submit.assert_not_called()
-                close.assert_called_once_with(99)
+                # Idle: block on the button and the wake pipe with no timeout.
+                self.assertEqual(sel.call_args_list[0].args, ([99, 97], [], [], None))
+                self.assertEqual(close.call_args_list, [mock.call(99), mock.call(97), mock.call(98)])
                 runner.close.assert_called_once()
 
 
