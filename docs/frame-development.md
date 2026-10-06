@@ -120,6 +120,14 @@ service still uses the permanent installation directory. See
 [framedrop.md](framedrop.md) for the build procedure and
 [validation.md](validation.md) for completed checks and remaining limits.
 
+The user confirmed that the published v0.1.2 native download installed in
+Windows FrameDrop 1.0.37, followed by a second installation offer. The public
+FrameDrop launch page sent the same protocol request through both a hidden
+iframe and top-level navigation. A script harness recorded two requests.
+The README now uses `docs/install.html` on this repository's GitHub Pages site,
+which sends one automatic request. After deployment the user confirmed that
+only one installation offer appeared. Manual retries require an explicit click.
+
 ## Battery percentage sources
 
 On October 5, 2026, the user reported Steam showing 51% then 50% while HEV spoke

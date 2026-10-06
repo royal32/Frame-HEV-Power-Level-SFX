@@ -125,5 +125,6 @@ cleanup, and visible error logs. Actual device checks are recorded in
 The manifest follows the published FrameDrop format. The user confirmed a
 successful Windows FrameDrop 1.0.37 install using the manually downloaded
 v0.1.1 ZIP. The v0.1.2 button also installed successfully on Windows, but the
-user then saw the duplicate offer from FrameDrop's public launch page. The
-replacement launch page still needs a Windows end-to-end check after deployment.
+user then saw the duplicate offer from FrameDrop's public launch page. After
+the replacement launch page was deployed, the user confirmed that Windows
+FrameDrop showed just one installation offer.

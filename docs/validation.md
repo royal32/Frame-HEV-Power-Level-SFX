@@ -158,6 +158,10 @@ Tested on October 5, 2026.
   recorded two identical requests. The replacement `docs/install.html` recorded
   one request to the same manifest. It is served through this repository's
   GitHub Pages deployment, with an explicit manual retry link.
-- **Still unverified:** the replacement launch page in Windows after deployment,
-  fresh-device audio download through the GUI, and graphical uninstall on a
-  real Frame.
+- GitHub Pages deployed the replacement page successfully. Its public HTML
+  matched the committed source, and the same JavaScript harness recorded one
+  request from the downloaded live page. The user then tested it in Windows
+  and confirmed: **“Yes, just one installation offer.”** The README now points
+  to this page. The published v0.1.2 release assets were not replaced.
+- **Still unverified:** fresh-device audio download through the GUI and
+  graphical uninstall on a real Frame.
