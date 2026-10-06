@@ -221,6 +221,12 @@ python3 -m unittest discover -s tests -v
 python3 tools/build_release.py
 ```
 
+On the Frame, `python3 tools/smoke_input.py` checks virtual button delivery and
+release of the input grab. `python3 tools/smoke_input.py --resume` checks aux
+resume handling through an isolated D-Bus, without suspending the headset.
+`python3 tools/measure_idle.py --seconds 60` measures idle CPU time and context
+switches on a virtual button. These checks do not generate physical power events.
+
 The release builder creates the source ZIP, tar.gz, and `dist/SHA256SUMS`, using
 the version in `VERSION`. To also build the FrameDrop ZIP and manifest, pass
 `--framedrop-launcher /path/to/frame-hev-setup`; see

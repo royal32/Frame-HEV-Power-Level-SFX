@@ -56,7 +56,7 @@ class GestureController:
 
     def tick(self, now):
         actions = []
-        if self.down is not None and not self.held_action and now - self.down >= self.long_hold:
+        if self.down is not None and not self.held_action and now >= self.down + self.long_hold:
             # A held second press takes precedence: dispatching the reserved
             # short first could suspend Steam before its long-press menu opens.
             self.pending = None
@@ -67,12 +67,6 @@ class GestureController:
             self.pending = None
             actions.append("short")
         return actions
-
-    def deadline(self):
-        """When tick() next has work, or None while idle (so the caller can block)."""
-        if self.down is not None:
-            return None if self.held_action else self.down + self.long_hold
-        return None if self.pending is None else self.pending + self.double_tap
 
     def event(self, value, now):
         if value == 2:  # Linux key repeat is never another tap.
@@ -98,6 +92,12 @@ class GestureController:
                     self.pending = now
             self.second = False
         return actions
+
+    def deadline(self):
+        """Next gesture decision, or None when input can wait indefinitely."""
+        if self.down is not None:
+            return None if self.held_action else self.down + self.long_hold
+        return None if self.pending is None else self.pending + self.double_tap
 
 
 def phrase(percent):
@@ -311,6 +311,92 @@ def stale_action(marker):
     return suspend_offset() - marker > 0.2
 
 
+class SleepMonitor:
+    """Subscribe to logind without another process, polling, or Python packages.
+
+    The stable libsystemd sd-bus API supplies an fd and its own event deadline.
+    All bus access and callbacks stay on the input thread.
+    """
+    MATCH = (b"type='signal',sender='org.freedesktop.login1',"
+             b"path='/org/freedesktop/login1',interface='org.freedesktop.login1.Manager',"
+             b"member='PrepareForSleep'")
+    CALLBACK = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
+
+    def __init__(self):
+        self.bus = ctypes.c_void_p()
+        self.slot = ctypes.c_void_p()
+        self.transitions = []
+        self.error = None
+        self.library = ctypes.CDLL("libsystemd.so.0")
+        signatures = {
+            "sd_bus_open_system": ([ctypes.POINTER(ctypes.c_void_p)], ctypes.c_int),
+            "sd_bus_set_method_call_timeout": ([ctypes.c_void_p, ctypes.c_uint64], ctypes.c_int),
+            "sd_bus_add_match": ([ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
+                                  ctypes.c_char_p, self.CALLBACK, ctypes.c_void_p], ctypes.c_int),
+            "sd_bus_message_read_basic": ([ctypes.c_void_p, ctypes.c_char, ctypes.c_void_p], ctypes.c_int),
+            "sd_bus_process": ([ctypes.c_void_p, ctypes.c_void_p], ctypes.c_int),
+            "sd_bus_get_fd": ([ctypes.c_void_p], ctypes.c_int),
+            "sd_bus_get_events": ([ctypes.c_void_p], ctypes.c_int),
+            "sd_bus_get_timeout": ([ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64)], ctypes.c_int),
+            "sd_bus_slot_unref": ([ctypes.c_void_p], ctypes.c_void_p),
+            "sd_bus_close_unref": ([ctypes.c_void_p], ctypes.c_void_p),
+        }
+        for name, (arguments, result) in signatures.items():
+            function = getattr(self.library, name)
+            function.argtypes, function.restype = arguments, result
+        # Keep the ctypes callback alive for as long as the registered slot.
+        self.callback = self.CALLBACK(self.signal)
+        try:
+            self.check(self.library.sd_bus_open_system(ctypes.byref(self.bus)))
+            self.check(self.library.sd_bus_set_method_call_timeout(self.bus, 2_000_000))
+            self.check(self.library.sd_bus_add_match(self.bus, ctypes.byref(self.slot),
+                                                     self.MATCH, self.callback, None))
+        except BaseException:
+            self.close()
+            raise
+
+    @staticmethod
+    def check(result):
+        if result < 0:
+            raise RuntimeError(f"logind sleep subscription failed: {os.strerror(-result)}")
+        return result
+
+    def signal(self, message, _userdata, _error):
+        # Exceptions cannot cross a ctypes callback; surface them in process().
+        try:
+            start = ctypes.c_int()
+            result = self.check(self.library.sd_bus_message_read_basic(message, b"b", ctypes.byref(start)))
+            if result != 1:
+                raise RuntimeError("logind sleep signal has no boolean")
+            self.transitions.append((bool(start.value), time.monotonic()))
+        except Exception as error:
+            self.error = error
+        return 0
+
+    def process(self):
+        while self.check(self.library.sd_bus_process(self.bus, None)):
+            pass
+        if self.error:
+            raise self.error
+        transitions, self.transitions = self.transitions, []
+        return transitions
+
+    def wait_state(self):
+        fd = self.check(self.library.sd_bus_get_fd(self.bus))
+        events = self.check(self.library.sd_bus_get_events(self.bus))
+        deadline = ctypes.c_uint64()
+        self.check(self.library.sd_bus_get_timeout(self.bus, ctypes.byref(deadline)))
+        return fd, events, None if deadline.value == 2**64 - 1 else deadline.value / 1_000_000
+
+    def close(self):
+        if self.slot.value:
+            self.library.sd_bus_slot_unref(self.slot)
+            self.slot = ctypes.c_void_p()
+        if self.bus.value:
+            self.library.sd_bus_close_unref(self.bus)
+            self.bus = ctypes.c_void_p()
+
+
 class ActionRunner:
     """Bounded queues keep input processing independent of subprocesses."""
     def __init__(self, args, wake=None):
@@ -365,7 +451,8 @@ class ActionRunner:
     def work(self, tasks):
         while not self.stop.is_set():
             item = tasks.get()
-            if item is None:  # close() sentinel
+            if item is None:
+                tasks.task_done()
                 return
             action, marker = item
             try:
@@ -406,7 +493,7 @@ class ActionRunner:
             try:
                 tasks.put_nowait(None)
             except queue.Full:
-                pass  # The worker is busy and sees stop before its next get().
+                pass  # A busy worker sees stop before waiting again.
         for thread in self.threads:
             thread.join(timeout=2.5)
 
@@ -439,23 +526,27 @@ def run(args):
                 raise RuntimeError("pw-play and the Steam executable are required")
             preparing_for_sleep()  # Verify logind before taking ownership of power.
         key = KEY_POWER if args.button == "power" else KEY_AUX
-        # Signals and worker errors write here so select can block while idle.
-        wake_r, wake_w = os.pipe2(os.O_NONBLOCK | os.O_CLOEXEC)
-        fd = os.open(device["path"], os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
-        runner = None
+        fd = wake_r = wake_w = None
+        runner = monitor = None
         quit_event = threading.Event()
         previous_handlers = {}
 
         def wake():
             try:
                 os.write(wake_w, b"\0")
-            except OSError:
-                pass  # Already pending, or closed during shutdown.
+            except (BlockingIOError, OSError):
+                pass  # A notification is pending, or cleanup has closed the pipe.
 
         def request_quit(*_):
             quit_event.set()
             wake()
+
         try:
+            wake_r, wake_w = os.pipe()  # Python creates non-inheritable descriptors.
+            os.set_blocking(wake_r, False)
+            os.set_blocking(wake_w, False)
+            monitor = SleepMonitor()  # Confirm subscription before grabbing power.
+            fd = os.open(device["path"], os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
             if key in get_bits(fd, 0x18):
                 raise RuntimeError("button is held; release it before starting")
             # Event timestamps must use the same clock as gesture deadlines.
@@ -473,34 +564,50 @@ def run(args):
                 previous_handlers[sig] = signal.signal(sig, request_quit)
             offset = time.clock_gettime(time.CLOCK_BOOTTIME) - time.monotonic()
             guard_until, dropping, buffer = 0.0, False, b""
+            sleeping = False
+
+            def update_resume():
+                nonlocal offset, guard_until, buffer, sleeping
+                transitions = monitor.process()
+                now = time.monotonic()
+                new_offset = time.clock_gettime(time.CLOCK_BOOTTIME) - now
+                for sleeping, timestamp in transitions:
+                    controller.reset()
+                    buffer = b""
+                    if not sleeping:
+                        guard_until = timestamp + args.resume_guard_ms / 1000
+                    LOG.info("logind: %s; gesture reset", "preparing for sleep" if sleeping else "resumed")
+                # Keep the independent clock check: suspend can race delivery
+                # of the bus signal, or occur while select is blocked.
+                if new_offset - offset > 0.2:
+                    controller.reset()
+                    guard_until = max(guard_until, now + args.resume_guard_ms / 1000)
+                    buffer = b""
+                    LOG.info("resume: gesture reset; discarding wake presses")
+                offset = new_offset
+                return now
+
             LOG.info("Ready device=%s name=%s button=%s", device["path"], device["name"], args.button)
             notify_ready()
             while not quit_event.is_set():
-                now = time.monotonic()
-                new_offset = time.clock_gettime(time.CLOCK_BOOTTIME) - now
-                if new_offset - offset > 0.2:
-                    controller.reset()
-                    guard_until = now + args.resume_guard_ms / 1000
-                    buffer = b""
-                    LOG.info("resume: gesture reset; discarding wake presses")
-                offset = new_offset
+                now = update_resume()
                 if not runner.errors.empty():
                     raise RuntimeError(f"power dispatch failed: {runner.errors.get()}")
-                deadline = controller.deadline()
-                timeout = None if deadline is None else max(0.0, deadline - now)
-                readable, _, _ = select.select([fd, wake_r], [], [], timeout)
-                # Suspend can occur inside select; check again before consuming
-                # wake events or advancing a held-button deadline.
-                now = time.monotonic()
-                new_offset = time.clock_gettime(time.CLOCK_BOOTTIME) - now
-                if new_offset - offset > 0.2:
-                    controller.reset()
-                    guard_until = now + args.resume_guard_ms / 1000
-                    buffer = b""
-                    LOG.info("resume: gesture reset; discarding wake presses")
-                offset = new_offset
+                bus_fd, bus_events, bus_deadline = monitor.wait_state()
+                deadlines = [d for d in (controller.deadline(), bus_deadline) if d is not None]
+                timeout = max(0.0, min(deadlines) - now) if deadlines else None
+                readers = [fd, wake_r] + ([bus_fd] if bus_events & select.POLLIN else [])
+                writers = [bus_fd] if bus_events & select.POLLOUT else []
+                readable, _, _ = select.select(readers, writers, [], timeout)
+                now = update_resume()
+                # A failed command or quit request must release the grab before
+                # any simultaneously queued button events can dispatch actions.
+                if quit_event.is_set():
+                    break
+                if not runner.errors.empty():
+                    raise RuntimeError(f"power dispatch failed: {runner.errors.get()}")
                 if wake_r in readable:
-                    os.read(wake_r, 64)
+                    os.read(wake_r, 4096)
                 if fd in readable:
                     chunk = os.read(fd, EVENT.size * 64)
                     if not chunk:
@@ -518,23 +625,27 @@ def run(args):
                             if event_type == EV_SYN and code == SYN_REPORT:
                                 dropping = False
                             continue
-                        if now < guard_until or timestamp < guard_until:
+                        if sleeping or now < guard_until or timestamp < guard_until:
                             continue
                         if event_type == EV_KEY and code == key:
                             for action in controller.event(value, timestamp):
                                 runner.submit(action)
-                if now >= guard_until and not dropping:
+                if not sleeping and now >= guard_until and not dropping:
                     for action in controller.tick(time.monotonic()):
                         runner.submit(action)
         finally:
             # Closing the file descriptor always releases EVIOCGRAB, even on error.
-            os.close(fd)
+            if fd is not None:
+                os.close(fd)
             if runner:
                 runner.close()
-            os.close(wake_r)
-            os.close(wake_w)
+            if monitor:
+                monitor.close()
             for sig, handler in previous_handlers.items():
                 signal.signal(sig, handler)
+            for pipe_fd in (wake_r, wake_w):
+                if pipe_fd is not None:
+                    os.close(pipe_fd)
             LOG.info("Stopped; native power handling restored")
 
 

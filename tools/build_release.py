@@ -25,7 +25,7 @@ REQUIRED = (
 )
 OPTIONAL = (
     'LICENSE.md', 'docs/frame-development.md', 'docs/validation.md',
-    'tools/frame-ui.mjs', 'tools/smoke_input.py', 'tests/test_frame_hev.py',
+    'tools/frame-ui.mjs', 'tools/smoke_input.py', 'tools/measure_idle.py', 'tests/test_frame_hev.py',
     'tests/test_fetch_sounds.py', 'tests/test_install.py', 'tests/test_framedrop.py',
     'docs/framedrop.md',
 )

@@ -165,3 +165,59 @@ Tested on October 5, 2026.
   to this page. The published v0.1.2 release assets were not replaced.
 - **Still unverified:** fresh-device audio download through the GUI and
   graphical uninstall on a real Frame.
+
+## Event-driven idle runtime (PR #1 adaptation)
+
+Tested on the development Mac and the Frame on October 5, 2026, SteamOS 0.4.3,
+build `20260930.6234839`, aarch64 Linux 6.18. No packages or kernel settings
+were changed. HEV had been uninstalled when this session began; baseline and
+candidate runs were staged separately under a temporary directory.
+
+- The optimization adds gesture deadlines, blocking worker queues, and a wake
+  pipe for signals and Steam dispatch errors. A logind sleep/resume subscription
+  fixes the delayed resume guard in aux mode. Mac tests use portable pipe mocks.
+- All 76 tests passed on the Mac and Frame. New coverage includes exact gesture
+  deadlines, aux resume without input, worker shutdown and error notification,
+  priority of shutdown/errors over simultaneous input, ctypes bus callbacks,
+  malformed signals/disconnects, and resource cleanup before grabbing power.
+- The virtual-input smoke test passed double/single/hold, exclusive input
+  delivery, and restored delivery to a second reader after shutdown. All power
+  actions were dry-run; no real power events were generated.
+- The private-bus aux resume check passed using real libsystemd/ctypes signal
+  delivery. It reset a pending gesture on sleep, ignored gestures during the
+  resume guard, announced a fresh double tap after the guard, and shut down
+  from idle. It did not suspend the headset.
+- The transactional installer downloaded and verified all 34 original clips
+  and installed the candidate. HEV was active and enabled, and the stock
+  `steamos-powerbuttond` remained active. Installed and local runtime hashes
+  matched. `doctor` succeeded with OpenVR at 37% and raw kernel capacity 34%.
+- A real command-line announcement completed through `pw-play`. The user
+  confirmed physical announcements, single-press sleep, wake, and announcements
+  after the resume guard: **“Everything works.”** Live logs recorded two real
+  sleep/resume cycles, logind signals, the independent clock guard, and fresh
+  announcements after waking. Both services remained active afterward.
+
+Idle measurements used `tools/measure_idle.py` with a virtual power device,
+dry-run actions, a separate lock, and one second of startup settling. Each
+60-second window sums CPU runtime and context switches across all three
+daemon threads. CPU percent below is relative to one core.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Elapsed seconds | 60.000073425 | 60.000078115 |
+| CPU seconds | 0.059377231 | 0 |
+| CPU percent of one core | 0.098961931% | 0% observed |
+| Voluntary context switches | 2,018 | 0 |
+| Involuntary context switches | 77 | 0 |
+| Threads | 3 | 3 |
+
+Baseline runtime SHA-256:
+`a117e3f1254e13b279a4ace8d23e3b468e7a632523effb059a522c0b5e926fcf`.
+Candidate and installed runtime SHA-256:
+`e4da99190b3e00dd2a3f9f81ac96a4debfc6c68d1392028c65f215b8ffd2049f`.
+
+These are process measurements from one controlled window per version,
+not measurements of headset-wide CPU use, physical CPU wakeups, or battery
+runtime. Physical power-mode sleep/wake was user-confirmed. Aux resume remains
+verified through virtual input and private-bus signals, rather than a physical
+aux test. The published v0.1.2 assets were not replaced.

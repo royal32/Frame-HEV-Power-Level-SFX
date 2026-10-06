@@ -159,3 +159,54 @@ and the user observed enlarged, overflowing text in the headset. The setup
 windows now request the same 720×420 dimensions, with short, explicitly broken
 lines in the progress message. Headset presentation must be checked in VR;
 desktop window sizing alone cannot establish the apparent text size.
+
+## Idle input processing and resume notifications
+
+On October 5, 2026, [PR #1](https://github.com/royal32/Frame-HEV-Power-Level-SFX/pull/1)'s polling optimization was adapted to the current
+runtime. The input thread now waits for input, a nonblocking shutdown/error
+pipe, or logind's `PrepareForSleep` signal. Worker queues block until work or a
+shutdown sentinel arrives. Gesture decisions supply explicit deadlines.
+
+Resume detection must not rely only on a later input event. In aux mode, waking
+with power need not produce an event on the watched aux device. Starting the
+resume guard only when the next aux gesture arrives would discard that fresh
+gesture, even if the user had waited several seconds after waking. A regression
+test covers this case. Sleep/resume notifications reset pending gestures and
+start the guard promptly; the independent BOOTTIME/MONOTONIC check remains.
+
+The Frame has `/usr/lib/libsystemd.so.0`. Its stable sd-bus API can subscribe to
+logind as the normal `steamos` user without installed Python packages or a
+monitor subprocess. The input thread processes the bus and waits for its fd,
+requested read/write events, and deadline, using the
+[documented event-loop integration](https://github.com/systemd/systemd/blob/main/man/sd_bus_get_fd.xml).
+The subscription is established before grabbing power. Bus failures release
+the input device; SIGTERM/SIGINT and Steam worker errors wake the input loop.
+
+Safe checks on an awake Frame:
+
+```sh
+python3 tools/smoke_input.py
+python3 tools/smoke_input.py --resume
+python3 tools/measure_idle.py --seconds 60
+```
+
+The first check uses a virtual power device with dry-run actions, verifies
+double/single/hold, exclusive delivery, and release after exit. `--resume` uses
+a virtual aux device and private `dbus-daemon`, with a fake logind sender. Its
+signals never reach the real system bus and never suspend the Frame. It checks
+real ctypes/sd-bus signal delivery, cancellation of a pending gesture on sleep,
+the resume guard, a fresh announcement after the guard, and idle shutdown.
+
+The measurement tool starts a separate dry-run daemon with a virtual device
+and lock, excludes startup, and sums all three threads' `/proc/PID/task/TID`
+`schedstat` CPU-runtime and `status` context-switch counters. It neither changes
+kernel scheduler settings nor grabs a physical button. Before/after 60-second
+results were 0.059377231 s CPU and 2,018 voluntary context switches versus
+0 s CPU and 0 context switches. This establishes removal of idle scheduling
+in that observation window, not battery-runtime savings or hardware wakeups.
+
+The user confirmed physical double-tap announcements, single-press sleep,
+wake, and announcements after waiting one second: **“Everything works.”**
+Live logs showed two sleep/resume cycles, real logind signals, the clock-based
+wake guard, and fresh announcements after resume. Both HEV and the native
+power service remained active afterward.
