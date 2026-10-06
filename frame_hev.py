@@ -68,6 +68,12 @@ class GestureController:
             actions.append("short")
         return actions
 
+    def deadline(self):
+        """When tick() next has work, or None while idle (so the caller can block)."""
+        if self.down is not None:
+            return None if self.held_action else self.down + self.long_hold
+        return None if self.pending is None else self.pending + self.double_tap
+
     def event(self, value, now):
         if value == 2:  # Linux key repeat is never another tap.
             return self.tick(now)
@@ -307,8 +313,9 @@ def stale_action(marker):
 
 class ActionRunner:
     """Bounded queues keep input processing independent of subprocesses."""
-    def __init__(self, args):
+    def __init__(self, args, wake=None):
         self.args = args
+        self.wake = wake
         self.audio = queue.Queue(maxsize=1)
         self.steam = queue.Queue(maxsize=8)
         self.errors = queue.Queue()
@@ -357,10 +364,10 @@ class ActionRunner:
 
     def work(self, tasks):
         while not self.stop.is_set():
-            try:
-                action, marker = tasks.get(timeout=0.1)
-            except queue.Empty:
-                continue
+            item = tasks.get()
+            if item is None:  # close() sentinel
+                return
+            action, marker = item
             try:
                 if stale_action(marker):
                     LOG.info("action=%s skipped: queued before resume", action)
@@ -384,6 +391,8 @@ class ActionRunner:
                 LOG.error("action=%s failed: %s", action, error)
                 if action != "announce":
                     self.errors.put(error)
+                    if self.wake:
+                        self.wake()
             finally:
                 tasks.task_done()
 
@@ -393,6 +402,11 @@ class ActionRunner:
             for process in self.processes:
                 if process.poll() is None:
                     process.terminate()
+        for tasks in (self.audio, self.steam):
+            try:
+                tasks.put_nowait(None)
+            except queue.Full:
+                pass  # The worker is busy and sees stop before its next get().
         for thread in self.threads:
             thread.join(timeout=2.5)
 
@@ -425,10 +439,22 @@ def run(args):
                 raise RuntimeError("pw-play and the Steam executable are required")
             preparing_for_sleep()  # Verify logind before taking ownership of power.
         key = KEY_POWER if args.button == "power" else KEY_AUX
+        # Signals and worker errors write here so select can block while idle.
+        wake_r, wake_w = os.pipe2(os.O_NONBLOCK | os.O_CLOEXEC)
         fd = os.open(device["path"], os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
         runner = None
         quit_event = threading.Event()
         previous_handlers = {}
+
+        def wake():
+            try:
+                os.write(wake_w, b"\0")
+            except OSError:
+                pass  # Already pending, or closed during shutdown.
+
+        def request_quit(*_):
+            quit_event.set()
+            wake()
         try:
             if key in get_bits(fd, 0x18):
                 raise RuntimeError("button is held; release it before starting")
@@ -442,9 +468,9 @@ def run(args):
                 LOG.warning("aux is observe-only; its native action also fires")
             controller = GestureController(args.double_tap_ms / 1000, args.long_hold_ms / 1000,
                                            args.debounce_ms / 1000)
-            runner = ActionRunner(args)
+            runner = ActionRunner(args, wake)
             for sig in (signal.SIGINT, signal.SIGTERM):
-                previous_handlers[sig] = signal.signal(sig, lambda *_: quit_event.set())
+                previous_handlers[sig] = signal.signal(sig, request_quit)
             offset = time.clock_gettime(time.CLOCK_BOOTTIME) - time.monotonic()
             guard_until, dropping, buffer = 0.0, False, b""
             LOG.info("Ready device=%s name=%s button=%s", device["path"], device["name"], args.button)
@@ -460,7 +486,9 @@ def run(args):
                 offset = new_offset
                 if not runner.errors.empty():
                     raise RuntimeError(f"power dispatch failed: {runner.errors.get()}")
-                readable, _, _ = select.select([fd], [], [], 0.1)
+                deadline = controller.deadline()
+                timeout = None if deadline is None else max(0.0, deadline - now)
+                readable, _, _ = select.select([fd, wake_r], [], [], timeout)
                 # Suspend can occur inside select; check again before consuming
                 # wake events or advancing a held-button deadline.
                 now = time.monotonic()
@@ -471,7 +499,9 @@ def run(args):
                     buffer = b""
                     LOG.info("resume: gesture reset; discarding wake presses")
                 offset = new_offset
-                if readable:
+                if wake_r in readable:
+                    os.read(wake_r, 64)
+                if fd in readable:
                     chunk = os.read(fd, EVENT.size * 64)
                     if not chunk:
                         raise RuntimeError("input device disconnected")
@@ -501,6 +531,8 @@ def run(args):
             os.close(fd)
             if runner:
                 runner.close()
+            os.close(wake_r)
+            os.close(wake_w)
             for sig, handler in previous_handlers.items():
                 signal.signal(sig, handler)
             LOG.info("Stopped; native power handling restored")
