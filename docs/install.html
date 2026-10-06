@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Install Frame HEV</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+      padding: 28px; background: #141618; color: #f1f2f3;
+      font: 17px/1.65 system-ui, sans-serif; }
+    main { width: 100%; max-width: 560px; }
+    .label { color: #e5ad56; font-size: 13px; font-weight: 700; letter-spacing: .1em; }
+    h1 { font-size: clamp(28px, 6vw, 38px); line-height: 1.2; margin: 12px 0 20px; }
+    p { color: #c7cbd0; }
+    a { color: #edb96a; text-underline-offset: 4px; }
+    a:focus-visible { outline: 3px solid #edb96a; outline-offset: 6px; }
+    .launch { display: inline-block; padding: 12px 20px; border-radius: 8px;
+      background: #edb96a; color: #191919; font-weight: 650; text-decoration: none; }
+    .links { margin-top: 32px; padding-top: 22px; border-top: 1px solid #383c41;
+      display: flex; flex-wrap: wrap; gap: 12px 24px; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="label">FRAME HEV</div>
+    <h1>Opening FrameDrop…</h1>
+    <p>Allow your browser to open FrameDrop, then confirm the installation there.
+      On your headset, launch <strong>Frame HEV</strong> to finish setup.</p>
+    <p>If FrameDrop did not open, try the link below.</p>
+    <a class="launch" id="launch" href="framedrop://install?manifest=https%3A%2F%2Fgithub.com%2Froyal32%2FFrame-HEV-Power-Level-SFX%2Freleases%2Flatest%2Fdownload%2Fframe-hev.framedrop.json">Open FrameDrop again</a>
+    <nav class="links" aria-label="Installation help">
+      <a href="https://framedropvr.com/">Get FrameDrop for Windows</a>
+      <a href="https://github.com/royal32/Frame-HEV-Power-Level-SFX/releases/latest">Manual downloads</a>
+      <a href="https://github.com/royal32/Frame-HEV-Power-Level-SFX#install">Installation guide</a>
+    </nav>
+  </main>
+  <script>
+    // Send one protocol request. An iframe plus a top-level navigation queues
+    // two installation offers in FrameDrop 1.0.37.
+    window.location.href = document.getElementById("launch").href;
+  </script>
+</body>
+</html>

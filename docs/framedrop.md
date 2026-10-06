@@ -11,6 +11,15 @@ latest GitHub release. That manifest points to a specific version's standalone
 Linux ARM64 `.bin` installer and its checksum, generated from the actual bytes.
 The ZIP asset remains available for manual drag-and-drop.
 
+The README button uses this repository's `docs/install.html` on GitHub Pages.
+It opens the manifest through `framedrop://` once. FrameDrop's public `/install`
+page was observed sending the same request twice, via a hidden iframe and a
+top-level navigation. After the v0.1.2 download fix, the user confirmed a
+successful Windows installation followed by a second installation offer.
+Using one navigation avoids submitting that duplicate request. The page includes
+an explicit retry link and links to FrameDrop, manual downloads, and the guide.
+GitHub Pages must publish `main:/docs`; `.nojekyll` keeps the HTML unchanged.
+
 ## FrameDrop 1.0.37 and GitHub redirects
 
 The v0.1.1 README button failed in FrameDrop 1.0.37 with “isn't an APK, zip,
@@ -115,5 +124,6 @@ cleanup, and visible error logs. Actual device checks are recorded in
 
 The manifest follows the published FrameDrop format. The user confirmed a
 successful Windows FrameDrop 1.0.37 install using the manually downloaded
-v0.1.1 ZIP. The revised button still needs a Windows end-to-end check after
-v0.1.2 publication; local package and headset tests do not establish that result.
+v0.1.1 ZIP. The v0.1.2 button also installed successfully on Windows, but the
+user then saw the duplicate offer from FrameDrop's public launch page. The
+replacement launch page still needs a Windows end-to-end check after deployment.

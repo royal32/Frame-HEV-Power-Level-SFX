@@ -14,7 +14,7 @@ additional packages, or SteamOS filesystem unlock needed.
 
 ### FrameDrop
 
-[![Install with FrameDrop](assets/framedrop-button.svg)](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Froyal32%2FFrame-HEV-Power-Level-SFX%2Freleases%2Flatest%2Fdownload%2Fframe-hev.framedrop.json)
+[![Install with FrameDrop](assets/framedrop-button.svg)](https://royal32.github.io/Frame-HEV-Power-Level-SFX/install.html)
 
 [Get FrameDrop](https://framedropvr.com/) · [Download the Linux ARM64 package](https://github.com/royal32/Frame-HEV-Power-Level-SFX/releases/download/v0.1.2/frame-hev-0.1.2-linux-arm64.zip)
 

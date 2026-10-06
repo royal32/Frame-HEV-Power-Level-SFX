@@ -150,6 +150,14 @@ Tested on October 5, 2026.
   power events were generated.
 - The runtime and gesture logic are unchanged in this release. PR #1 remains
   separate from this packaging fix.
-- **Still unverified:** the revised README button's full Windows download and
-  transfer flow after publication, fresh-device audio download through the GUI,
-  and graphical uninstall on a real Frame.
+- The user subsequently confirmed that the published v0.1.2 button installed
+  successfully in Windows FrameDrop, then displayed another offer to install.
+  Inspection of `framedropvr.com/install` found two unconditional protocol
+  requests: a hidden iframe and a top-level navigation. A JavaScript harness
+  executing that page's launch script with instrumented browser interfaces
+  recorded two identical requests. The replacement `docs/install.html` recorded
+  one request to the same manifest. It is served through this repository's
+  GitHub Pages deployment, with an explicit manual retry link.
+- **Still unverified:** the replacement launch page in Windows after deployment,
+  fresh-device audio download through the GUI, and graphical uninstall on a
+  real Frame.
