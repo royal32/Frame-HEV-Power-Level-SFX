@@ -20,7 +20,8 @@ REQUIRED = (
     'assets/README.md', 'assets/manifest.json', 'config/environment',
     'systemd/frame-hev.service', 'tools/install.sh', 'tools/install.py', 'tools/uninstall.sh',
     'tools/control.sh', 'tools/fetch_sounds.py', 'tools/build_release.py',
-    'tools/framedrop.py', 'tools/framedrop-launcher.c', 'assets/framedrop-button.svg',
+    'tools/framedrop.py', 'tools/framedrop-launcher.c', 'tools/framedrop-entry.py',
+    'assets/framedrop-button.svg',
 )
 OPTIONAL = (
     'LICENSE.md', 'docs/frame-development.md', 'docs/validation.md',
@@ -61,8 +62,11 @@ def validate_launcher(launcher: Path) -> bytes:
     return data
 
 
-def write_zip(path: Path, entries: list[tuple[str, bytes, int]]) -> None:
-    with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+def write_zip(path: Path, entries: list[tuple[str, bytes, int]], *, prefix: bytes = b'') -> None:
+    # Appending a ZIP to ELF produces a native executable that Python can also
+    # run as a zipapp. Keep offsets relative to the complete file.
+    path.write_bytes(prefix)
+    with zipfile.ZipFile(path, 'a', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name, data, mode in entries:
             info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             info.create_system = 3
@@ -91,19 +95,25 @@ def build(output: Path, version: str, files: list[Path], *, framedrop_launcher: 
                     archive.addfile(info, io.BytesIO(data))
     artifacts = [zip_path, tar_path]
     if launcher_data is not None:
-        # One native entry point at the root prevents auto-detection from
-        # choosing a command-line helper. Source files are data, not executables.
-        framedrop_zip = output / f'{prefix}-linux-arm64.zip'
-        entries = [('frame-hev-setup', launcher_data, 0o755)]
+        # FrameDrop 1.0.37 loses the .zip extension on GitHub release redirects.
+        # Its ELF detection uses magic bytes, so the manifest uses a standalone
+        # ELF+ZIP containing all source and an extraction entry point.
+        native = output / f'{prefix}-linux-arm64.bin'
+        entries = [('__main__.py', (ROOT / 'tools/framedrop-entry.py').read_bytes(), 0o644)]
         entries.extend((f'payload/{path.relative_to(ROOT).as_posix()}', data, 0o644) for path, data in contents)
-        write_zip(framedrop_zip, entries)
+        write_zip(native, entries, prefix=launcher_data)
+        native.chmod(0o755)
+        # Retain a ZIP for manual drag-and-drop. There is exactly one file to
+        # launch and it is independent of extraction location and filename.
+        framedrop_zip = output / f'{prefix}-linux-arm64.zip'
+        write_zip(framedrop_zip, [('frame-hev-setup', native.read_bytes(), 0o755)])
         manifest = output / FRAMEDROP_MANIFEST
         manifest.write_text(json.dumps({
             'schema': 'framedrop.install/v1', 'name': 'Frame HEV',
-            'files': [{'url': f'{RELEASE_URL}/v{version}/{framedrop_zip.name}',
-                       'sha256': hashlib.sha256(framedrop_zip.read_bytes()).hexdigest()}],
+            'files': [{'url': f'{RELEASE_URL}/v{version}/{native.name}',
+                       'sha256': hashlib.sha256(native.read_bytes()).hexdigest()}],
         }, indent=2) + '\n', encoding='utf-8')
-        artifacts.extend([framedrop_zip, manifest])
+        artifacts.extend([native, framedrop_zip, manifest])
     checksums = output / 'SHA256SUMS'
     checksums.write_text(''.join(
         f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n'
@@ -116,7 +126,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path, default=ROOT / 'dist', help='Destination directory (default: repository dist/)')
     parser.add_argument('--list', action='store_true', help='List allowlisted files without creating archives')
-    parser.add_argument('--framedrop-launcher', type=Path, help='Linux ARM64 frame-hev-setup binary; also build the FrameDrop ZIP and manifest')
+    parser.add_argument('--framedrop-launcher', type=Path, help='Linux ARM64 frame-hev-setup stub; also build the standalone installer, ZIP, and manifest')
     args = parser.parse_args()
     try:
         files = files_for_release()

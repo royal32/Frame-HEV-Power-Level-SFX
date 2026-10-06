@@ -112,7 +112,44 @@ Tested on the development Mac and the Frame on October 5, 2026.
   on exit; all power actions were dry-run on a virtual device.
 - A subsequent Steam menu read showed 36%; the real announcement selected
   “Power level is thirty six percent” and playback completed successfully.
-- **Still unverified:** Windows FrameDrop download/transfer and automatic
+- **Unverified at initial v0.1.1 publication:** Windows FrameDrop download/transfer and automatic
   executable selection, a fresh-device audio download through the GUI, and
   graphical uninstall on a real Frame. Tests of the launcher and manifest do
   not imply that the Windows client has been run end-to-end.
+
+## FrameDrop redirect compatibility (v0.1.2)
+
+Tested on October 5, 2026.
+
+- The user tested the published README button in Windows FrameDrop 1.0.37.
+  It failed with the unsupported-file-type error. Downloading the same v0.1.1
+  Linux ARM64 ZIP in the browser and dropping the saved file into FrameDrop
+  succeeded, confirming manual transfer and launch-target detection.
+- The official 1.0.37 installer was unpacked for static inspection, without
+  running or installing FrameDrop on the development Mac. Its downloader names
+  files from the final redirect URL and its ZIP detector requires `.zip`.
+  The public release URL returned a valid, checksum-matching ZIP but redirected
+  to an extensionless identifier on `release-assets.githubusercontent.com`.
+  The response's correct `Content-Disposition` filename is ignored by this
+  FrameDrop version.
+- The revised manifest targets a standalone AArch64 ELF containing the setup
+  source as an appended Python ZIP application. The manual ZIP contains that
+  same executable. FrameDrop's file detector identifies ELF by its bytes, so
+  losing the suffix no longer prevents detection.
+- All 64 tests pass on both the Mac and Frame. New checks exercise the embedded
+  entry point after an extensionless rename, paths with spaces, forwarding of
+  arguments/exit status, and keeping extracted files until the child finishes
+  before removing them. Manifest checks cover the native file's checksum and
+  reproducible output for all six release assets.
+- The updated launcher compiled on the Frame with `cc -O2 -Wall -Wextra -Werror`.
+  The complete installer was copied there as an extensionless filename, then
+  launched natively from `/`. `--help` and a real `--no-ui` update both succeeded.
+  The installed version was 0.1.2; all 34 verified audio clips were reused, the
+  settings checksum was unchanged, and both HEV and `steamos-powerbuttond`
+  remained active. No packages were installed on the Frame and no physical
+  power events were generated.
+- The runtime and gesture logic are unchanged in this release. PR #1 remains
+  separate from this packaging fix.
+- **Still unverified:** the revised README button's full Windows download and
+  transfer flow after publication, fresh-device audio download through the GUI,
+  and graphical uninstall on a real Frame.

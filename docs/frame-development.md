@@ -101,11 +101,24 @@ Normal Steam launches supply the display themselves. Merely seeing an X11
 window in `xwininfo` does not prove that it is visible or usable in the headset;
 the user's confirmation supplied that check here.
 
-The FrameDrop ZIP deliberately has a single native executable at its root;
-all helper sources live below `payload/` with non-executable ZIP modes. It uses
-the official manifest schema and a versioned, checksummed URL. Actual Windows
-FrameDrop selection and transfer remain unverified. See [framedrop.md](framedrop.md)
-for the build procedure and [validation.md](validation.md) for limits.
+The v0.1.1 FrameDrop ZIP has a single native executable at its root and helper
+sources below `payload/`. The user subsequently confirmed successful Windows
+FrameDrop 1.0.37 selection and transfer by downloading that ZIP in the browser
+and dragging it into FrameDrop. The README button failed before transfer.
+
+Static inspection of the official FrameDrop 1.0.37 download confirmed that
+`fetch.download_file` derives its saved filename from the final redirect URL,
+while `detect._is_zip_bundle` requires a `.zip` suffix. The public GitHub release
+download redirects to an extensionless identifier, despite a correct
+`Content-Disposition` filename and matching ZIP checksum. This explains the
+button failure and why a direct `url=` link to the same ZIP would also fail.
+
+The v0.1.2 package uses an ELF launcher with an appended Python ZIP application.
+FrameDrop recognizes ELF magic even with an extensionless filename. Setup
+extracts its source into a temporary directory until the installer exits; the
+service still uses the permanent installation directory. See
+[framedrop.md](framedrop.md) for the build procedure and
+[validation.md](validation.md) for completed checks and remaining limits.
 
 ## Battery percentage sources
 

@@ -16,7 +16,7 @@ additional packages, or SteamOS filesystem unlock needed.
 
 [![Install with FrameDrop](assets/framedrop-button.svg)](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Froyal32%2FFrame-HEV-Power-Level-SFX%2Freleases%2Flatest%2Fdownload%2Fframe-hev.framedrop.json)
 
-[Get FrameDrop](https://framedropvr.com/) · [Download the Linux ARM64 package](https://github.com/royal32/Frame-HEV-Power-Level-SFX/releases/download/v0.1.1/frame-hev-0.1.1-linux-arm64.zip)
+[Get FrameDrop](https://framedropvr.com/) · [Download the Linux ARM64 package](https://github.com/royal32/Frame-HEV-Power-Level-SFX/releases/download/v0.1.2/frame-hev-0.1.2-linux-arm64.zip)
 
 1. Enable **Settings → System → Enable Developer Mode** on the Frame. Keep it
    awake and on the same Wi-Fi as your PC.
@@ -32,7 +32,10 @@ the first time. Announcements then run in the background; you do not need to
 keep the library entry open. Launch it again to update or uninstall. Removing
 only the Steam library entry does **not** uninstall the background service.
 
-FrameDrop support requires **v0.1.1 or later**. See
+The button requires **HEV v0.1.2 or later**. With v0.1.1, download the Linux
+ARM64 ZIP in your browser and drop the saved file into FrameDrop. FrameDrop
+1.0.37 loses the ZIP extension when following GitHub's download redirect;
+v0.1.2 uses a self-contained Linux installer that survives this rename. See
 [package and validation details](docs/framedrop.md).
 
 ### Terminal installation
