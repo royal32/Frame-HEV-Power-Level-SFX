@@ -12,7 +12,32 @@ additional packages, or SteamOS filesystem unlock needed.
 
 ## Install
 
-### 1. Prepare the Frame once
+### FrameDrop
+
+[![Install with FrameDrop](assets/framedrop-button.svg)](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Froyal32%2FFrame-HEV-Power-Level-SFX%2Freleases%2Flatest%2Fdownload%2Fframe-hev.framedrop.json)
+
+[Get FrameDrop](https://framedropvr.com/) · [Download the Linux ARM64 package](https://github.com/royal32/Frame-HEV-Power-Level-SFX/releases/download/v0.1.1/frame-hev-0.1.1-linux-arm64.zip)
+
+1. Enable **Settings → System → Enable Developer Mode** on the Frame. Keep it
+   awake and on the same Wi-Fi as your PC.
+2. Pair once: on the headset choose **Settings → Developer → Pair new host**;
+   in FrameDrop click **Pair**, then approve on the headset.
+3. Click **Install with FrameDrop** above and confirm the installation in
+   FrameDrop. You can also drop the Linux ARM64 ZIP into FrameDrop.
+4. On the headset, open **Library → Non-Steam → Frame HEV** and choose
+   **Install**. Wait for the success message, then close the app.
+
+Setup downloads the original voice clips, so the Frame needs internet access
+the first time. Announcements then run in the background; you do not need to
+keep the library entry open. Launch it again to update or uninstall. Removing
+only the Steam library entry does **not** uninstall the background service.
+
+FrameDrop support requires **v0.1.1 or later**. See
+[package and validation details](docs/framedrop.md).
+
+### Terminal installation
+
+#### 1. Prepare the Frame once
 
 On the headset, enable **Settings → System → Enable Developer Mode**, then open
 **Settings → Developer → Set User Password** and choose a password. This enables
@@ -23,7 +48,7 @@ and [SSH documentation](https://partner.steamgames.com/doc/steamhardware/steamfr
 Keep the Frame awake, with Steam running, and connect it to the same network as
 your computer.
 
-### 2. Download and run
+#### 2. Download and run
 
 Download the release ZIP, or choose **Code → Download ZIP** on GitHub, and
 **extract the whole folder**. Open a terminal in that extracted folder.
@@ -77,6 +102,10 @@ To update, download a newer release and run the same installer again. It reuses
 verified audio and preserves your settings. It prepares and checks the update
 before replacing the running installation, and rolls back if startup fails.
 
+With FrameDrop, install the newer package and launch **Frame HEV** again, then
+choose **Install / Update**. Choose **Uninstall** in that window to remove the
+background service while keeping your settings and audio cache.
+
 To uninstall, connect with `ssh steamos@frame.local` and run:
 
 ```sh
@@ -114,6 +143,11 @@ the wake press is ignored so it does not immediately put the headset to sleep.
 
 At 0%, the original “Armor compromised” clip plays, because the HEV vocabulary
 does not contain a recorded zero.
+
+Announcements use SteamVR's headset battery percentage to match Steam's
+display. The kernel's raw battery reading can differ by several points. If
+SteamVR cannot provide a valid reading, HEV uses the kernel value and logs that
+fallback; `frame-hev doctor` shows the selected source and the raw reading.
 
 ## Audio
 
@@ -184,9 +218,10 @@ python3 -m unittest discover -s tests -v
 python3 tools/build_release.py
 ```
 
-The release builder creates `dist/frame-hev-0.1.0.zip`,
-`dist/frame-hev-0.1.0.tar.gz`, and `dist/SHA256SUMS`, using the version in
-`VERSION`. Attach those three files to a GitHub release. The builder uses an
+The release builder creates the source ZIP, tar.gz, and `dist/SHA256SUMS`, using
+the version in `VERSION`. To also build the FrameDrop ZIP and manifest, pass
+`--framedrop-launcher /path/to/frame-hev-setup`; see
+[FrameDrop release instructions](docs/framedrop.md). The builder uses an
 explicit file list and excludes audio, credentials, local agent settings, and
 Git history.
 

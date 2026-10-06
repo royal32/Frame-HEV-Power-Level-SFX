@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import fcntl
 import hashlib
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import queue
@@ -16,6 +18,7 @@ import signal
 import socket
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -27,6 +30,7 @@ KEY_POWER, KEY_AUX = 116, 353
 EVENT = struct.Struct("llHHi")
 DEFAULT_ASSETS = Path(__file__).resolve().parent / "assets" / "fvox"
 STEAM = Path.home() / ".steam/steam/steamrtarm64/steam"
+OPENVR_LIBRARY = "/opt/steamvr/bin/linuxarm64/libopenvr_api.so"
 WORDS = ("zero one two three four five six seven eight nine ten eleven twelve "
          "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
 TENS = {20: "twenty", 30: "thirty", 40: "fourty", 50: "fifty", 60: "sixty",
@@ -107,7 +111,61 @@ def phrase(percent):
     return ["power_level_is", *number, "percent"]
 
 
-def read_battery(root=Path("/sys/class/power_supply")):
+def openvr_battery_percent():
+    """Read SteamVR's HMD battery property in the isolated probe subprocess.
+
+    ABI: Valve openvr_capi.h at 0924064316de3effbcd1acf1e309182a2deb1c05,
+    IVRSystem_026. Its GetFloatTrackedDeviceProperty is function-table slot 23.
+    Request this exact interface version; never reuse the offset with another.
+    """
+    library = ctypes.CDLL(OPENVR_LIBRARY)
+    error_pointer = ctypes.POINTER(ctypes.c_int)
+    library.VR_InitInternal.argtypes = [error_pointer, ctypes.c_int]
+    library.VR_InitInternal.restype = ctypes.c_size_t
+    library.VR_GetGenericInterface.argtypes = [ctypes.c_char_p, error_pointer]
+    library.VR_GetGenericInterface.restype = ctypes.c_void_p
+    library.VR_ShutdownInternal.argtypes = []
+    library.VR_ShutdownInternal.restype = None
+    error = ctypes.c_int()
+    library.VR_InitInternal(ctypes.byref(error), 3)  # VRApplication_Background
+    if error.value:
+        raise RuntimeError(f"OpenVR background connection failed ({error.value})")
+    try:
+        address = library.VR_GetGenericInterface(b"FnTable:IVRSystem_026", ctypes.byref(error))
+        if error.value or not address:
+            raise RuntimeError(f"OpenVR IVRSystem_026 is unavailable ({error.value})")
+        table = ctypes.cast(address, ctypes.POINTER(ctypes.c_void_p))
+        if not table[23]:
+            raise RuntimeError("OpenVR battery query is unavailable")
+        get_float = ctypes.CFUNCTYPE(ctypes.c_float, ctypes.c_uint32, ctypes.c_int, error_pointer)(table[23])
+        fraction = get_float(0, 1012, ctypes.byref(error))  # HMD, Prop_DeviceBatteryPercentage_Float
+        if error.value or not math.isfinite(fraction) or not 0 <= fraction <= 1:
+            raise RuntimeError(f"OpenVR returned an invalid HMD battery value ({error.value}, {fraction})")
+        # 45% arrives as a float such as 0.449999988, so truncation is wrong.
+        return int(fraction * 100 + 0.5)
+    finally:
+        library.VR_ShutdownInternal()
+
+
+def read_battery(root=None):
+    """Prefer SteamVR's displayed level; an explicit root reads sysfs only."""
+    if root is None:
+        try:
+            # Keep native API failures and hangs away from the process holding
+            # the power-device grab. No cached percentage or calibration offset.
+            result = subprocess.run([sys.executable, str(Path(__file__).resolve()), "_openvr-battery"],
+                                    capture_output=True, text=True, check=True, timeout=2)
+            report = json.loads(result.stdout)
+            percent = report.get("percent") if isinstance(report, dict) else None
+            if type(percent) is not int or not 0 <= percent <= 100:
+                raise ValueError("invalid OpenVR battery probe result")
+            return "openvr:hmd", percent
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            LOG.warning("SteamVR battery unavailable (%s); using raw kernel level", error)
+    return read_sysfs_battery(Path("/sys/class/power_supply") if root is None else root)
+
+
+def read_sysfs_battery(root):
     candidates = []
     for path in sorted(Path(root).iterdir()):
         try:
@@ -316,8 +374,8 @@ class ActionRunner:
                     LOG.info("action=%s skipped: preparing for sleep", action)
                     continue
                 if action == "announce":
-                    _, percent = read_battery()
-                    LOG.info("action=announce percent=%s phrase=%s", percent, " ".join(phrase(percent)))
+                    source, percent = read_battery()
+                    LOG.info("action=announce percent=%s source=%s phrase=%s", percent, source, " ".join(phrase(percent)))
                     path = compose_wave(self.args.assets, percent)
                     self.execute(["pw-play", f"--volume={self.args.volume}", str(path)], 30, marker)
                 else:
@@ -453,8 +511,15 @@ def doctor(args):
         "pw-play": shutil.which("pw-play"), "busctl": shutil.which("busctl"),
         "steam": str(args.steam), "steam_exists": Path(args.steam).is_file()}}
     try:
-        path, percent = read_battery()
-        report["battery"] = {"path": str(path), "percent": percent}
+        source, percent = read_battery()
+        report["battery"] = {"source": str(source), "percent": percent}
+        if isinstance(source, Path):
+            report["battery"]["path"] = str(source)
+        try:
+            raw_path, raw_percent = read_sysfs_battery(Path("/sys/class/power_supply"))
+            report["battery"]["kernel"] = {"path": str(raw_path), "percent": raw_percent}
+        except (OSError, RuntimeError) as error:
+            report["battery"]["kernel"] = {"error": str(error)}
     except (OSError, RuntimeError) as error:
         report["battery"] = {"error": str(error)}
     try:
@@ -501,6 +566,14 @@ def parser():
 
 
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if argv == ["_openvr-battery"]:
+        try:
+            print(json.dumps({"percent": openvr_battery_percent()}))
+            return 0
+        except (OSError, RuntimeError, AttributeError) as error:
+            print(str(error), file=sys.stderr)
+            return 1
     arg_parser = parser()
     args = arg_parser.parse_args(argv)
     if not 0 <= args.volume <= 1:

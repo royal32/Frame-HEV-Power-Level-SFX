@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="268" height="48" viewBox="0 0 268 48" role="img" aria-labelledby="title">
+  <title id="title">Install with FrameDrop</title>
+  <rect x="0.5" y="0.5" width="267" height="47" rx="5" fill="#080809" stroke="#e6b54a"/>
+  <path d="M36 14v23H13v-7" fill="none" stroke="#e6b54a" stroke-width="2.5"/>
+  <path d="M30 12H13v13" fill="none" stroke="#cb3c3d" stroke-width="2.5"/>
+  <path d="M13 25v5" stroke="#df9747" stroke-width="2.5"/>
+  <rect x="33" y="9" width="6" height="6" fill="#c41e3a"/>
+  <text x="52" y="29" fill="#e6b54a" font-family="system-ui, sans-serif" font-size="15" font-weight="600">Install with FrameDrop</text>
+</svg>

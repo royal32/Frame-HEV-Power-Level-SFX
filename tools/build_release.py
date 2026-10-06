@@ -6,8 +6,10 @@ import argparse
 import gzip
 import hashlib
 import io
+import json
 import re
 import stat
+import struct
 import tarfile
 import zipfile
 from pathlib import Path
@@ -18,12 +20,16 @@ REQUIRED = (
     'assets/README.md', 'assets/manifest.json', 'config/environment',
     'systemd/frame-hev.service', 'tools/install.sh', 'tools/install.py', 'tools/uninstall.sh',
     'tools/control.sh', 'tools/fetch_sounds.py', 'tools/build_release.py',
+    'tools/framedrop.py', 'tools/framedrop-launcher.c', 'assets/framedrop-button.svg',
 )
 OPTIONAL = (
     'LICENSE.md', 'docs/frame-development.md', 'docs/validation.md',
     'tools/frame-ui.mjs', 'tools/smoke_input.py', 'tests/test_frame_hev.py',
-    'tests/test_fetch_sounds.py', 'tests/test_install.py',
+    'tests/test_fetch_sounds.py', 'tests/test_install.py', 'tests/test_framedrop.py',
+    'docs/framedrop.md',
 )
+RELEASE_URL = 'https://github.com/royal32/Frame-HEV-Power-Level-SFX/releases/download'
+FRAMEDROP_MANIFEST = 'frame-hev.framedrop.json'
 # Fixed metadata makes identical source trees produce identical archives.
 EPOCH = 315532800  # 1980-01-01 UTC, also the earliest ZIP timestamp.
 
@@ -44,19 +50,36 @@ def file_mode(path: Path) -> int:
     return 0o755 if path.suffix in {'.sh', '.ps1', '.py', '.mjs'} else 0o644
 
 
-def build(output: Path, version: str, files: list[Path]) -> list[Path]:
+def validate_launcher(launcher: Path) -> bytes:
+    """Reject the wrong platform before publishing a native FrameDrop bundle."""
+    if launcher.is_symlink() or not launcher.is_file():
+        raise ValueError('FrameDrop launcher must be a regular Linux ARM64 executable')
+    data = launcher.read_bytes()
+    if (len(data) < 64 or data[:7] != b'\x7fELF\x02\x01\x01'
+            or struct.unpack_from('<HH', data, 16) not in ((2, 183), (3, 183))):
+        raise ValueError('FrameDrop launcher must be a 64-bit little-endian AArch64 ELF executable')
+    return data
+
+
+def write_zip(path: Path, entries: list[tuple[str, bytes, int]]) -> None:
+    with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for name, data, mode in entries:
+            info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | mode) << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, data, compresslevel=9)
+
+
+def build(output: Path, version: str, files: list[Path], *, framedrop_launcher: Path | None = None) -> list[Path]:
+    launcher_data = validate_launcher(framedrop_launcher) if framedrop_launcher else None
     output.mkdir(parents=True, exist_ok=True)
     prefix = f'frame-hev-{version}'
     zip_path = output / f'{prefix}.zip'
     tar_path = output / f'{prefix}.tar.gz'
     contents = [(path, path.read_bytes()) for path in files]
-    with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        for path, data in contents:
-            info = zipfile.ZipInfo(f'{prefix}/{path.relative_to(ROOT).as_posix()}', (1980, 1, 1, 0, 0, 0))
-            info.create_system = 3
-            info.external_attr = (stat.S_IFREG | file_mode(path)) << 16
-            info.compress_type = zipfile.ZIP_DEFLATED
-            archive.writestr(info, data, compresslevel=9)
+    write_zip(zip_path, [(f'{prefix}/{path.relative_to(ROOT).as_posix()}', data, file_mode(path))
+                         for path, data in contents])
     with tar_path.open('wb') as raw:
         with gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=EPOCH, compresslevel=9) as compressed:
             with tarfile.open(fileobj=compressed, mode='w', format=tarfile.PAX_FORMAT) as archive:
@@ -66,18 +89,34 @@ def build(output: Path, version: str, files: list[Path]) -> list[Path]:
                     info.mode = file_mode(path)
                     info.mtime = EPOCH
                     archive.addfile(info, io.BytesIO(data))
+    artifacts = [zip_path, tar_path]
+    if launcher_data is not None:
+        # One native entry point at the root prevents auto-detection from
+        # choosing a command-line helper. Source files are data, not executables.
+        framedrop_zip = output / f'{prefix}-linux-arm64.zip'
+        entries = [('frame-hev-setup', launcher_data, 0o755)]
+        entries.extend((f'payload/{path.relative_to(ROOT).as_posix()}', data, 0o644) for path, data in contents)
+        write_zip(framedrop_zip, entries)
+        manifest = output / FRAMEDROP_MANIFEST
+        manifest.write_text(json.dumps({
+            'schema': 'framedrop.install/v1', 'name': 'Frame HEV',
+            'files': [{'url': f'{RELEASE_URL}/v{version}/{framedrop_zip.name}',
+                       'sha256': hashlib.sha256(framedrop_zip.read_bytes()).hexdigest()}],
+        }, indent=2) + '\n', encoding='utf-8')
+        artifacts.extend([framedrop_zip, manifest])
     checksums = output / 'SHA256SUMS'
     checksums.write_text(''.join(
         f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n'
-        for path in (zip_path, tar_path)
+        for path in artifacts
     ), encoding='ascii')
-    return [zip_path, tar_path, checksums]
+    return [*artifacts, checksums]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path, default=ROOT / 'dist', help='Destination directory (default: repository dist/)')
     parser.add_argument('--list', action='store_true', help='List allowlisted files without creating archives')
+    parser.add_argument('--framedrop-launcher', type=Path, help='Linux ARM64 frame-hev-setup binary; also build the FrameDrop ZIP and manifest')
     args = parser.parse_args()
     try:
         files = files_for_release()
@@ -88,7 +127,7 @@ def main() -> None:
             for path in files:
                 print(path.relative_to(ROOT).as_posix())
         else:
-            for path in build(args.output_dir.resolve(), version, files):
+            for path in build(args.output_dir.resolve(), version, files, framedrop_launcher=args.framedrop_launcher):
                 print(path)
     except (OSError, ValueError) as error:
         parser.exit(1, f'build_release: {error}\n')

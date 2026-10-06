@@ -1,6 +1,9 @@
 import importlib.util
+import ctypes
+import json
 from pathlib import Path
 import tempfile
+import subprocess
 from types import SimpleNamespace
 import unittest
 from unittest import mock
@@ -108,6 +111,92 @@ class BatteryTests(unittest.TestCase):
             self.battery(root, "system2", 55)
             with self.assertRaises(RuntimeError):
                 hev.read_battery(root)
+
+
+class SteamVRBatteryTests(unittest.TestCase):
+    def library(self, fraction=0.45, *, init_error=0, property_error=0, interface_error=0):
+        error_pointer = ctypes.POINTER(ctypes.c_int)
+        def initialize(error, application):
+            self.assertEqual(application, 3)
+            ctypes.cast(error, error_pointer)[0] = init_error
+            return 1
+
+        def get_float(device, prop, error):
+            self.assertEqual((device, prop), (0, 1012))
+            error[0] = property_error
+            return fraction
+
+        callback = ctypes.CFUNCTYPE(ctypes.c_float, ctypes.c_uint32, ctypes.c_int, error_pointer)(get_float)
+        table = (ctypes.c_void_p * 24)()
+        table[23] = ctypes.cast(callback, ctypes.c_void_p).value
+
+        def get_interface(name, error):
+            self.assertEqual(name, b"FnTable:IVRSystem_026")
+            ctypes.cast(error, error_pointer)[0] = interface_error
+            return ctypes.addressof(table) if not interface_error else None
+
+        library = mock.Mock()
+        library.VR_InitInternal.side_effect = initialize
+        library.VR_GetGenericInterface.side_effect = get_interface
+        # Keep ctypes objects alive for the native callback during the test.
+        library.fixture_table, library.fixture_callback = table, callback
+        return library
+
+    def test_hmd_percent_uses_nearest_integer_including_float_representation(self):
+        for fraction, expected in ((0.45, 45), (0.46, 46), (0.51, 51), (0, 0), (1, 100)):
+            library = self.library(fraction)
+            with self.subTest(fraction=fraction), mock.patch.object(hev.ctypes, "CDLL", return_value=library):
+                self.assertEqual(hev.openvr_battery_percent(), expected)
+                library.VR_ShutdownInternal.assert_called_once()
+
+    def test_invalid_properties_are_rejected_and_connection_closed(self):
+        for fraction, error in ((float("nan"), 0), (float("inf"), 0), (-0.1, 0), (1.1, 0), (0.45, 4)):
+            library = self.library(fraction, property_error=error)
+            with self.subTest(fraction=fraction, error=error), mock.patch.object(hev.ctypes, "CDLL", return_value=library):
+                with self.assertRaisesRegex(RuntimeError, "invalid HMD battery"):
+                    hev.openvr_battery_percent()
+                library.VR_ShutdownInternal.assert_called_once()
+
+    def test_init_failure_does_not_use_function_table(self):
+        library = self.library(init_error=121)
+        with mock.patch.object(hev.ctypes, "CDLL", return_value=library):
+            with self.assertRaisesRegex(RuntimeError, "connection failed"):
+                hev.openvr_battery_percent()
+        library.VR_GetGenericInterface.assert_not_called()
+        library.VR_ShutdownInternal.assert_not_called()
+
+    def test_interface_mismatch_is_rejected_and_connection_closed(self):
+        library = self.library(interface_error=105)
+        with mock.patch.object(hev.ctypes, "CDLL", return_value=library):
+            with self.assertRaisesRegex(RuntimeError, "IVRSystem_026 is unavailable"):
+                hev.openvr_battery_percent()
+        library.VR_ShutdownInternal.assert_called_once()
+
+    def test_prefers_fresh_steamvr_level_over_raw_kernel_capacity(self):
+        with (mock.patch.object(hev.subprocess, "run", side_effect=[
+                subprocess.CompletedProcess([], 0, stdout=json.dumps({"percent": 51})),
+                subprocess.CompletedProcess([], 0, stdout=json.dumps({"percent": 50})),
+              ]) as query,
+              mock.patch.object(hev, "read_sysfs_battery", return_value=(Path("/battery"), 46)) as kernel):
+            self.assertEqual(hev.read_battery(), ("openvr:hmd", 51))
+            self.assertEqual(hev.read_battery(), ("openvr:hmd", 50))
+            self.assertEqual(query.call_args.kwargs["timeout"], 2)
+            self.assertTrue(query.call_args.kwargs["check"])
+            kernel.assert_not_called()
+
+    def test_probe_timeout_or_crash_falls_back_without_interrupting_button_handling(self):
+        for error in (subprocess.TimeoutExpired("probe", 2), subprocess.CalledProcessError(-11, "probe"), OSError("missing")):
+            with (self.subTest(error=type(error)), mock.patch.object(hev.subprocess, "run", side_effect=error),
+                  mock.patch.object(hev, "read_sysfs_battery", return_value=(Path("/battery"), 46)),
+                  self.assertLogs("frame-hev", level="WARNING")):
+                self.assertEqual(hev.read_battery(), (Path("/battery"), 46))
+
+    def test_bad_probe_output_falls_back(self):
+        for output in ("not json", "[]", '{"percent":null}', '{"percent":true}', '{"percent":101}', '{"percent":-1}'):
+            with (self.subTest(output=output), mock.patch.object(hev.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=output)),
+                  mock.patch.object(hev, "read_sysfs_battery", return_value=(Path("/battery"), 46)),
+                  self.assertLogs("frame-hev", level="WARNING")):
+                self.assertEqual(hev.read_battery(), (Path("/battery"), 46))
 
 
 class AudioTests(unittest.TestCase):

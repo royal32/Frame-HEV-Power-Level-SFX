@@ -85,3 +85,56 @@ now rejects ISE and redirected stdin before attempting SSH, and failed-upload
 cleanup uses `BatchMode=yes` with a connection timeout so cleanup cannot open
 another password/host-key prompt. Standard SSH host-key checking is preserved.
 Real Windows prompt behavior still needs a Windows test.
+
+## FrameDrop launch checks
+
+On October 5, 2026, this Frame had `cc`, `zenity` 4.0.1, `kdialog`, and `konsole`
+available without installing packages. A small native AArch64 executable can
+locate its package through `/proc/self/exe` and run `/usr/bin/python3` with a
+script path relative to the executable. This worked from an unrelated working
+directory, including a real update through the existing HEV installer.
+
+The graphical entry point uses Zenity on Steam's display. For an SSH-launched
+test, `systemctl --user show-environment` reported `DISPLAY=:0`; setting that
+for the launcher opened the window, and the user confirmed successful setup.
+Normal Steam launches supply the display themselves. Merely seeing an X11
+window in `xwininfo` does not prove that it is visible or usable in the headset;
+the user's confirmation supplied that check here.
+
+The FrameDrop ZIP deliberately has a single native executable at its root;
+all helper sources live below `payload/` with non-executable ZIP modes. It uses
+the official manifest schema and a versioned, checksummed URL. Actual Windows
+FrameDrop selection and transfer remain unverified. See [framedrop.md](framedrop.md)
+for the build procedure and [validation.md](validation.md) for limits.
+
+## Battery percentage sources
+
+On October 5, 2026, the user reported Steam showing 51% then 50% while HEV spoke
+46% then 45%. A read-only comparison later in the same session found Steam's
+visible menu at **45%**, OpenVR's HMD `Prop_DeviceBatteryPercentage_Float` at
+`0.449999988`, and the kernel's battery `capacity` at **41%**. UPower also used
+the raw kernel value. Changing to UPower would therefore not resolve this
+discrepancy. The difference is not a constant offset to add to the kernel value.
+
+HEV now queries OpenVR's headset battery value for each announcement. The
+standard-library `ctypes` binding uses the installed
+`/opt/steamvr/bin/linuxarm64/libopenvr_api.so` and explicitly requests
+`FnTable:IVRSystem_026`, matching Valve's pinned
+[C API declaration](https://github.com/ValveSoftware/openvr/blob/0924064316de3effbcd1acf1e309182a2deb1c05/headers/openvr_capi.h).
+Function-table slot 23 is `GetFloatTrackedDeviceProperty`; property 1012 on
+device 0 is the headset's battery fraction. The fractional value must be
+rounded, not truncated: `0.449999988` means 45%, not 44%.
+
+This native query runs in a separate Python process with a two-second timeout
+so a native-library crash or hang cannot terminate the process holding the
+power input device. It connects as a background app and shuts down its own
+connection after the read. Unsupported interfaces, invalid properties, missing
+libraries, crashes, and timeouts fall back to the existing kernel battery
+selection with a warning. `doctor` reports both values for diagnosis. No
+percentage is cached and no hand-tuned correction is applied.
+
+The first GUI progress window was shorter than the action/success dialogs,
+and the user observed enlarged, overflowing text in the headset. The setup
+windows now request the same 720×420 dimensions, with short, explicitly broken
+lines in the progress message. Headset presentation must be checked in VR;
+desktop window sizing alone cannot establish the apparent text size.
